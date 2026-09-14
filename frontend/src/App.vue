@@ -8,7 +8,7 @@ import type { Device } from "@/types/device";
 
 const devices: Device[] = mockDevices;
 const sidebarOpen = ref(true);
-const selectedId = ref<string | null>(devices[0]?.device_id ?? null);
+const selectedId = ref<string | null>(null);
 const selectionRequest = ref(0);
 
 function selectDevice(deviceId: string) {

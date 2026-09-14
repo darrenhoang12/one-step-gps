@@ -50,10 +50,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ select: [deviceId: string] }>();
 
-const apiKey = env.googleMapsApiKey ?? "";
-const mapState = ref<"preview" | "loading" | "ready" | "error">(
-  apiKey ? "loading" : "preview",
-);
+const mapState = ref<"loading" | "ready" | "error">("loading");
 const mapElement = ref<HTMLElement | null>(null);
 const markerElements = new Map<string, HTMLElement>();
 let map: MapInstance | null = null;
@@ -144,10 +141,10 @@ function previewPosition(device: Device & LatLng) {
 }
 
 onMounted(async () => {
-  if (!apiKey || !mapElement.value) return;
+  if (!mapElement.value) return;
 
   try {
-    const google = await loadMaps(apiKey);
+    const google = await loadMaps(env.googleMapsApiKey);
     if (!mapElement.value) return;
 
     map = new google.maps.Map(mapElement.value, {
@@ -254,15 +251,13 @@ defineExpose({ fitAll });
         <span class="notice-dot" />
         <div>
           <strong>{{
-            mapState === "loading" ? "Loading Google Maps" : "Map preview"
+            mapState === "loading" ? "Loading Google Maps" : "Map unavailable"
           }}</strong>
           <p>
             {{
               mapState === "error"
                 ? "Google Maps could not load. Check your API key and billing settings."
-                : apiKey
-                  ? "Preparing the live map and device markers."
-                  : "Add VITE_GOOGLE_MAPS_API_KEY to show the live Google map."
+              : "Preparing the live map and device markers."
             }}
           </p>
         </div>

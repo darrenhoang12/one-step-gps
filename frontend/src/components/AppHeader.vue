@@ -7,8 +7,6 @@ import { MapPin } from "@lucide/vue";
     <div class="brand-block">
       <div class="brand-symbol"><MapPin :size="19" :stroke-width="2.6" /></div>
       <div class="brand-name">One Step <span>GPS</span></div>
-      <span class="brand-divider" />
-      <span class="workspace-name">Fleet workspace</span>
     </div>
     <div class="topbar-right">
       <span class="demo-label"><i /> DEMO DATA</span>
@@ -55,18 +53,7 @@ import { MapPin } from "@lucide/vue";
 .brand-name span {
   color: #ff9a75;
 }
-.brand-divider {
-  display: block;
-  height: 23px;
-  width: 1px;
-  margin: 0 20px;
-  background: #52647a;
-}
-.workspace-name {
-  color: #b3c0ce;
-  font-size: 13px;
-  font-weight: 500;
-}
+
 .topbar-right {
   gap: 20px;
 }
@@ -103,8 +90,6 @@ import { MapPin } from "@lucide/vue";
     height: 62px;
     padding: 0 16px;
   }
-  .workspace-name,
-  .brand-divider,
   .demo-label {
     display: none;
   }
