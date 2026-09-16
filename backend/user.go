@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -231,7 +233,11 @@ func uploadDeviceIcon(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, 
 			ON CONFLICT (device_id) DO UPDATE SET icon_storage_path = EXCLUDED.icon_storage_path, updated_at = NOW()
 		`, deviceID, storagePath)
 	if err != nil {
-		_ = storage.Delete(r.Context(), storagePath)
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
+		if cleanupErr := storage.Delete(cleanupCtx, storagePath); cleanupErr != nil {
+			log.Printf("cleaning up unsaved device icon: %v", cleanupErr)
+		}
+		cancel()
 		log.Printf("saving device icon: %v", err)
 		http.Error(w, "could not save icon", http.StatusInternalServerError)
 		return
