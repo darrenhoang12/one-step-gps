@@ -16,6 +16,7 @@ const props = defineProps<{
   dragging?: boolean;
   dropPosition?: "before" | "after" | null;
   saving?: boolean;
+  busy?: boolean;
 }>();
 const emit = defineEmits<{
   select: [deviceId: string];
@@ -116,33 +117,33 @@ function startDrag(event: DragEvent) {
     >
     <form v-if="editing" class="name-editor" @click.stop @submit.prevent="saveName">
       <Input v-model="customName" maxlength="80" aria-label="Custom device name" autofocus />
-      <Button type="submit" size="sm">Save</Button>
+      <Button type="submit" size="sm" :disabled="busy">Save</Button>
       <Button type="button" size="sm" variant="ghost" @click="editing = false">Cancel</Button>
     </form>
     <span v-else class="card-actions" @click.stop>
-      <Button variant="ghost" size="icon-sm" title="Rename device" @click="beginEditing"><Pencil :size="14" /></Button>
+      <Button variant="ghost" size="icon-sm" title="Rename device" :disabled="busy" @click="beginEditing"><Pencil :size="14" /></Button>
       <Button
         v-if="device.custom_display_name"
         variant="ghost"
         size="icon-sm"
         title="Reset to original name"
         aria-label="Reset to original device name"
-        :disabled="saving"
+        :disabled="busy"
         @click="emit('update', device.device_id, { custom_display_name: null })"
       >
         <RotateCcw :size="14" />
       </Button>
-      <Button variant="ghost" size="icon-sm" :title="device.hidden ? 'Show device' : 'Hide device'" @click="emit('update', device.device_id, { hidden: !device.hidden })">
+      <Button variant="ghost" size="icon-sm" :title="device.hidden ? 'Show device' : 'Hide device'" :disabled="busy" @click="emit('update', device.device_id, { hidden: !device.hidden })">
         <Eye v-if="device.hidden" :size="14" /><EyeOff v-else :size="14" />
       </Button>
-      <Button variant="ghost" size="icon-sm" title="Upload device icon (max 5 MB, 1024×1024)" @click="fileInput?.click()"><Upload :size="14" /></Button>
+      <Button variant="ghost" size="icon-sm" title="Upload device icon (max 5 MB, 1024×1024)" :disabled="busy" @click="fileInput?.click()"><Upload :size="14" /></Button>
       <Button
         v-if="device.icon_url"
         variant="ghost"
         size="icon-sm"
         title="Remove device icon"
         aria-label="Remove device icon"
-        :disabled="saving"
+        :disabled="busy"
         @click="emit('removeIcon', device.device_id)"
       ><ImageOff :size="14" /></Button>
       <input ref="fileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="chooseFile" />

@@ -12,12 +12,14 @@ import {
   uploadDeviceIcon,
 } from "@/lib/devicesApi";
 import { reorderVisibleDevices } from "@/lib/deviceOrder";
+import { createSerialTaskQueue } from "@/lib/serialTaskQueue";
 import type { Device, DevicePreferenceUpdate } from "@/types/device";
 
 const queryClient = useQueryClient();
 const queryKey = ["devices"] as const;
 const deviceRefreshInterval = 30_000;
 const pendingWrites = ref(0);
+const enqueueWrite = createSerialTaskQueue();
 const { data, isPending, error, refetch } = useQuery({
   queryKey,
   queryFn: ({ signal }) => fetchDevices(signal),
@@ -60,17 +62,21 @@ function retryDevices() {
   void refetch();
 }
 
-async function withPausedPolling(action: () => Promise<void>) {
+function withPausedPolling(action: () => Promise<void>) {
   pendingWrites.value++;
-  try {
-    await queryClient.cancelQueries({ queryKey });
-    await action();
-  } finally {
-    pendingWrites.value--;
-    if (pendingWrites.value === 0) {
-      void queryClient.invalidateQueries({ queryKey });
+  void enqueueWrite(async () => {
+    try {
+      await queryClient.cancelQueries({ queryKey });
+      await action();
+    } catch (cause) {
+      preferenceError.value = actionError(cause, "Could not save preferences");
+    } finally {
+      pendingWrites.value--;
+      if (pendingWrites.value === 0) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
     }
-  }
+  });
 }
 
 function actionError(cause: unknown, fallback: string): string {
@@ -195,6 +201,7 @@ async function removeIcon(deviceId: string) {
         :error="loadError?.message ?? null"
         :preference-error="preferenceError ?? refreshError"
         :saving-ids="savingIds"
+        :busy="pendingWrites > 0"
         @select="selectDevice"
         @close="sidebarOpen = false"
         @retry="retryDevices"

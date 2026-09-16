@@ -25,6 +25,7 @@ const props = defineProps<{
   error: string | null;
   preferenceError: string | null;
   savingIds: Set<string>;
+  busy: boolean;
 }>();
 const emit = defineEmits<{
   select: [deviceId: string];
@@ -68,7 +69,7 @@ const filteredDevices = computed(() =>
     );
   }),
 );
-const canReorder = computed(() => filter.value === "all" && !search.value.trim());
+const canReorder = computed(() => !props.busy && filter.value === "all" && !search.value.trim());
 
 function dropDevice(targetId: string) {
   const sourceId = draggedId.value;
@@ -249,6 +250,7 @@ watch(
               :dragging="draggedId === device.device_id"
               :drop-position="dropTargetId === device.device_id ? dropPosition : null"
               :saving="savingIds.has(device.device_id)"
+              :busy="busy"
               @select="emit('select', $event)"
               @update="updateDevice"
               @upload="uploadIcon"

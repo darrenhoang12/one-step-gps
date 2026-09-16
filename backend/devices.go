@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -14,6 +15,8 @@ import (
 type upstreamDevicesResponse struct {
 	ResultList []map[string]any `json:"result_list"`
 }
+
+var deviceHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 func getDevices(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +31,7 @@ func getDevices(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
 			http.Error(w, "could not create device request", http.StatusInternalServerError)
 			return
 		}
-		response, err := http.DefaultClient.Do(request)
+		response, err := deviceHTTPClient.Do(request)
 		if err != nil {
 			http.Error(w, "could not fetch devices", http.StatusBadGateway)
 			return

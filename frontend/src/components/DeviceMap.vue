@@ -119,14 +119,14 @@ function fitAll() {
     });
 }
 
-function focusDevice(deviceId: string | null) {
+function focusDevice(deviceId: string | null, zoomToDevice = true) {
   if (!map || !deviceId) return;
   const device = locatedDevices.value.find(
     (item) => item.device_id === deviceId,
   );
   if (!device) return;
   map.panTo({ lat: device.lat, lng: device.lng });
-  map.setZoom(12);
+  if (zoomToDevice) map.setZoom(12);
   if (props.sidebarOpen && window.innerWidth > 760) {
     map.panBy((Math.min(window.innerWidth / 3, 420) + 18) / 2, 0);
   }
@@ -248,8 +248,21 @@ watch(theme, () => {
 
 watch(
   () => props.devices,
-  () => {
-    if (map && window.google?.maps?.Map) syncMarkers(window.google);
+  (_devices, previousDevices) => {
+    if (!map || !window.google?.maps?.Map) return;
+    syncMarkers(window.google);
+    const selected = locatedDevices.value.find(
+      (device) => device.device_id === props.selectedId,
+    );
+    const previous = previousDevices.find(
+      (device) => device.device_id === props.selectedId,
+    );
+    if (
+      selected &&
+      (selected.lat !== previous?.lat || selected.lng !== previous?.lng)
+    ) {
+      focusDevice(selected.device_id, false);
+    }
   },
 );
 
