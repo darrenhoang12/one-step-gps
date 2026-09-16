@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import DeviceListControls from "./DeviceListControls.vue";
 import SummaryCard from "./SummaryCard.vue";
+import { deviceMovement } from "@/lib/deviceMovement";
 import type { DeviceFilter } from "./DeviceListControls.vue";
 import type { Device } from "@/types/device";
 
@@ -49,7 +50,7 @@ const onlineCount = computed(
 );
 const movingCount = computed(
   () =>
-    props.devices.filter((device) => device.online && device.speed > 2).length,
+    props.devices.filter((device) => deviceMovement(device) === "moving").length,
 );
 const filteredDevices = computed(() =>
   props.devices.filter((device) => {

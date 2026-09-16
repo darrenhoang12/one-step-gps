@@ -17,7 +17,7 @@ import type { Device, DevicePreferenceUpdate } from "@/types/device";
 
 const queryClient = useQueryClient();
 const queryKey = ["devices"] as const;
-const deviceRefreshInterval = 30_000;
+const deviceRefreshInterval = 15_000;
 const pendingWrites = ref(0);
 const enqueueWrite = createSerialTaskQueue();
 const { data, isPending, error, refetch } = useQuery({

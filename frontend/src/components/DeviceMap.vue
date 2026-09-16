@@ -126,9 +126,10 @@ function focusDevice(deviceId: string | null, zoomToDevice = true) {
   );
   if (!device) return;
   map.panTo({ lat: device.lat, lng: device.lng });
-  if (zoomToDevice) map.setZoom(12);
+  if (zoomToDevice) map.setZoom(16);
   if (props.sidebarOpen && window.innerWidth > 760) {
-    map.panBy((Math.min(window.innerWidth / 3, 420) + 18) / 2, 0);
+    // Move the map center left so the device sits in the center of the space beside the sidebar.
+    map.panBy(-(Math.min(window.innerWidth / 3, 420) + 18) / 2, 0);
   }
 }
 
@@ -163,10 +164,7 @@ function syncMarkers(google: MapsApi) {
       markerElements.set(device.device_id, pin);
     }
     pin.className = `google-device-pin ${device.online ? "is-online" : "is-offline"}`;
-    pin.classList.toggle(
-      "is-selected",
-      device.device_id === props.selectedId,
-    );
+    pin.classList.toggle("is-selected", device.device_id === props.selectedId);
     pin.textContent = device.display_name.slice(0, 2).toUpperCase();
     pin.setAttribute("aria-label", device.display_name);
 
@@ -350,7 +348,7 @@ defineExpose({ fitAll });
             {{
               mapState === "error"
                 ? "Google Maps could not load. Check your API key and billing settings."
-              : "Preparing the live map and device markers."
+                : "Preparing the live map and device markers."
             }}
           </p>
         </div>
@@ -565,24 +563,46 @@ defineExpose({ fitAll });
 :global(.dark) .map-preview {
   background: #1c2a35;
   background-image:
-    linear-gradient(27deg, transparent 48%, #334450 49%, #334450 51%, transparent 52%),
-    linear-gradient(152deg, transparent 47%, #243d46 48%, #243d46 52%, transparent 53%);
+    linear-gradient(
+      27deg,
+      transparent 48%,
+      #334450 49%,
+      #334450 51%,
+      transparent 52%
+    ),
+    linear-gradient(
+      152deg,
+      transparent 47%,
+      #243d46 48%,
+      #243d46 52%,
+      transparent 53%
+    );
 }
-:global(.dark) .terrain-one { background: #263d42; }
-:global(.dark) .terrain-two { background: #2b4341; }
-:global(.dark) .terrain-three { background: #243a45; }
+:global(.dark) .terrain-one {
+  background: #263d42;
+}
+:global(.dark) .terrain-two {
+  background: #2b4341;
+}
+:global(.dark) .terrain-three {
+  background: #243a45;
+}
 :global(.dark) .road {
   background: #4b5050;
   border-color: #51615f;
   box-shadow: 0 0 0 5px #394b4b;
 }
-:global(.dark) .map-region { color: #8ea9ab; }
+:global(.dark) .map-region {
+  color: #8ea9ab;
+}
 :global(.dark) .map-preview-notice {
   background: #182637ed;
   box-shadow: 0 10px 38px #07101988;
   color: #e5edf5;
 }
-:global(.dark) .map-preview-notice p { color: #a4b3c2; }
+:global(.dark) .map-preview-notice p {
+  color: #a4b3c2;
+}
 :global(.google-device-pin) {
   display: grid;
   place-items: center;

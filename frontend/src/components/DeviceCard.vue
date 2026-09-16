@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Clock3, Eye, EyeOff, Gauge, GripVertical, ImageOff, MapPin, Pencil, RotateCcw, Truck, Upload } from "@lucide/vue";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ImageCropDialog from "@/components/ImageCropDialog.vue";
 import { formatCoordinates, formatReportedAt } from "@/lib/deviceFormat";
+import { deviceMovement } from "@/lib/deviceMovement";
 import type { Device } from "@/types/device";
 
 const props = defineProps<{
@@ -33,6 +34,7 @@ const customName = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
 const imageToCrop = ref<File | null>(null);
 const fileError = ref<string | null>(null);
+const movement = computed(() => deviceMovement(props.device));
 
 function beginEditing() {
   customName.value = props.device.custom_display_name ?? props.device.display_name;
@@ -107,6 +109,10 @@ function startDrag(event: DragEvent) {
     <span class="card-divider" />
     <span class="card-data">
       <span><Gauge :size="14" /> {{ Math.round(device.speed) }} mph</span>
+      <span class="movement-status" :class="movement">
+        <i aria-hidden="true" />
+        {{ movement === "moving" ? "Moving" : movement === "stopped" ? "Stopped" : "Movement unknown" }}
+      </span>
       <span
         ><Clock3 :size="14" />
         {{ formatReportedAt(device.last_reported_at) }}</span
@@ -329,6 +335,43 @@ function startDrag(event: DragEvent) {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+.movement-status {
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.movement-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.movement-status.moving {
+  color: #16734a;
+  background: #e7f6ee;
+}
+.movement-status.stopped {
+  color: #895016;
+  background: #fff1da;
+}
+.movement-status.unknown {
+  color: #64758a;
+  background: #edf1f4;
+}
+:global(.dark) .movement-status.moving {
+  color: #8de1b3;
+  background: #193e35;
+}
+:global(.dark) .movement-status.stopped {
+  color: #f3cb87;
+  background: #453824;
+}
+:global(.dark) .movement-status.unknown {
+  color: #b4c2d0;
+  background: #304154;
 }
 .card-actions,
 .name-editor {
