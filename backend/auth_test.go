@@ -9,7 +9,7 @@ import (
 )
 
 func TestAPIKeyAuthentication(t *testing.T) {
-	const key = "a-test-api-key-with-more-than-32-characters"
+	const key = "local-dev-key"
 	auth := apiKeyAuth{keyHash: sha256.Sum256([]byte(key))}
 	protected := auth.requireKey(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -41,13 +41,17 @@ func TestAPIKeyAuthentication(t *testing.T) {
 }
 
 func TestAPIKeyConfiguration(t *testing.T) {
-	t.Setenv("APP_API_KEY", "short")
+	t.Setenv("APP_API_KEY", "")
 	if _, err := newAPIKeyAuth(); err == nil {
-		t.Fatal("short key was accepted")
+		t.Fatal("empty key was accepted")
 	}
-	t.Setenv("APP_API_KEY", "a-test-api-key-with-more-than-32-characters")
+	t.Setenv("APP_API_KEY", "  ")
+	if _, err := newAPIKeyAuth(); err == nil {
+		t.Fatal("whitespace-only key was accepted")
+	}
+	t.Setenv("APP_API_KEY", "local-dev-key")
 	if _, err := newAPIKeyAuth(); err != nil {
-		t.Fatalf("valid key was rejected: %v", err)
+		t.Fatalf("short nonempty key was rejected: %v", err)
 	}
 }
 

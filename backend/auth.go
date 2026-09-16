@@ -14,9 +14,9 @@ type apiKeyAuth struct {
 }
 
 func newAPIKeyAuth() (apiKeyAuth, error) {
-	key := os.Getenv("APP_API_KEY")
-	if len(key) < 32 {
-		return apiKeyAuth{}, errors.New("APP_API_KEY must be at least 32 characters")
+	key := strings.TrimSpace(os.Getenv("APP_API_KEY"))
+	if key == "" {
+		return apiKeyAuth{}, errors.New("APP_API_KEY is required")
 	}
 	return apiKeyAuth{keyHash: sha256.Sum256([]byte(key))}, nil
 }

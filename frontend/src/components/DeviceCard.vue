@@ -202,19 +202,19 @@ function startDrag(event: DragEvent) {
   z-index: 3;
   right: 4px;
   left: 4px;
-  height: 3px;
+  height: 2px;
   border-radius: 999px;
   background: #e56843;
-  box-shadow: 0 0 0 4px #f8ded6;
+  box-shadow: 0 0 0 2px #f8ded6;
   content: "";
   pointer-events: none;
   animation: drop-indicator 0.18s ease-out;
 }
 .device-card.drop-before::before {
-  top: -7px;
+  top: -5px;
 }
 .device-card.drop-after::after {
-  bottom: -7px;
+  bottom: -5px;
 }
 .device-card.drop-before,
 .device-card.drop-after {
