@@ -2,12 +2,6 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import type { Device, DevicePreferenceUpdate } from "@/types/device";
 
-export class UnauthorizedError extends Error {
-  constructor() {
-    super("Access denied. The app's API key may be misconfigured.");
-  }
-}
-
 const deviceResponseSchema = z.object({
   result_list: z.array(
     z.object({
@@ -174,11 +168,8 @@ async function apiFetch(
   networkMessage: string,
 ): Promise<Response> {
   try {
-    const headers = new Headers(options.headers);
-    headers.set("Authorization", `Bearer ${env.appApiKey}`);
     return await fetch(`${env.apiBaseUrl}${path}`, {
       ...options,
-      headers,
       credentials: "omit",
     });
   } catch (cause) {
@@ -193,7 +184,6 @@ async function requireSuccessfulResponse(
   fallbackMessage: string,
 ): Promise<void> {
   if (response.ok) return;
-  if (response.status === 401) throw new UnauthorizedError();
   const detail = (await response.text()).trim();
   if (detail && detail.length <= 160 && !detail.startsWith("<")) {
     throw new Error(detail.charAt(0).toUpperCase() + detail.slice(1));

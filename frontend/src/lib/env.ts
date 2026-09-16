@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  VITE_APP_API_KEY: z.string().trim().min(1, "VITE_APP_API_KEY is required"),
   VITE_GOOGLE_MAPS_API_KEY: z.string().trim().min(1, "VITE_GOOGLE_MAPS_API_KEY is required"),
   VITE_GOOGLE_MAPS_MAP_ID: z.preprocess(
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
@@ -19,7 +18,6 @@ const envSchema = z.object({
 const parsed = envSchema.parse(import.meta.env);
 
 export const env = {
-  appApiKey: parsed.VITE_APP_API_KEY,
   googleMapsApiKey: parsed.VITE_GOOGLE_MAPS_API_KEY,
   googleMapsMapId: parsed.VITE_GOOGLE_MAPS_MAP_ID,
   apiBaseUrl: parsed.VITE_API_BASE_URL?.replace(/\/+$/, "") ?? "",

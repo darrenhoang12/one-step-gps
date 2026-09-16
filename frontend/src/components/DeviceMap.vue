@@ -21,6 +21,8 @@ type BoundsInstance = { extend: (position: LatLng) => void };
 type MarkerInstance = {
   addListener: (event: string, callback: () => void) => void;
   map: MapInstance | null;
+  position: LatLng;
+  title: string;
 };
 type MapsApi = {
   maps: {
@@ -60,7 +62,7 @@ const { theme } = useTheme();
 const mapState = ref<"loading" | "ready" | "error">("loading");
 const mapElement = ref<HTMLElement | null>(null);
 const markerElements = new Map<string, HTMLElement>();
-const markers: MarkerInstance[] = [];
+const markers = new Map<string, MarkerInstance>();
 let map: MapInstance | null = null;
 let initialBounds: BoundsInstance | null = null;
 let mapsPromise: Promise<MapsApi> | null = null;
@@ -148,12 +150,59 @@ function previewPosition(device: Device & LatLng) {
   };
 }
 
+function syncMarkers(google: MapsApi) {
+  if (!map) return;
+  const bounds = new google.maps.LatLngBounds();
+  const currentIds = new Set<string>();
+  for (const device of locatedDevices.value) {
+    currentIds.add(device.device_id);
+    const position = { lat: device.lat, lng: device.lng };
+    let pin = markerElements.get(device.device_id);
+    if (!pin) {
+      pin = document.createElement("div");
+      markerElements.set(device.device_id, pin);
+    }
+    pin.className = `google-device-pin ${device.online ? "is-online" : "is-offline"}`;
+    pin.classList.toggle(
+      "is-selected",
+      device.device_id === props.selectedId,
+    );
+    pin.textContent = device.display_name.slice(0, 2).toUpperCase();
+    pin.setAttribute("aria-label", device.display_name);
+
+    const marker = markers.get(device.device_id);
+    if (marker) {
+      marker.position = position;
+      marker.title = device.display_name;
+    } else {
+      const newMarker = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        position,
+        title: device.display_name,
+        content: pin,
+      });
+      newMarker.addListener("click", () => emit("select", device.device_id));
+      markers.set(device.device_id, newMarker);
+    }
+    bounds.extend(position);
+  }
+
+  for (const [id, marker] of markers) {
+    if (currentIds.has(id)) continue;
+    marker.map = null;
+    markers.delete(id);
+    markerElements.delete(id);
+  }
+
+  initialBounds = currentIds.size > 0 ? bounds : null;
+}
+
 function createMap(google: MapsApi, preserveView = false) {
   if (!mapElement.value) return;
   const center = preserveView ? map?.getCenter()?.toJSON() : undefined;
   const zoom = preserveView ? map?.getZoom() : undefined;
-  for (const marker of markers) marker.map = null;
-  markers.length = 0;
+  for (const marker of markers.values()) marker.map = null;
+  markers.clear();
   markerElements.clear();
   mapElement.value.replaceChildren();
 
@@ -174,31 +223,8 @@ function createMap(google: MapsApi, preserveView = false) {
     gestureHandling: "greedy",
   });
 
-  const bounds = new google.maps.LatLngBounds();
-  for (const device of locatedDevices.value) {
-    const position = { lat: device.lat, lng: device.lng };
-    const pin = document.createElement("div");
-    pin.className = `google-device-pin ${device.online ? "is-online" : "is-offline"}`;
-    pin.classList.toggle(
-      "is-selected",
-      device.device_id === props.selectedId,
-    );
-    pin.textContent = device.display_name.slice(0, 2).toUpperCase();
-    pin.setAttribute("aria-label", device.display_name);
-    markerElements.set(device.device_id, pin);
+  syncMarkers(google);
 
-    const marker = new google.maps.marker.AdvancedMarkerElement({
-      map,
-      position,
-      title: device.display_name,
-      content: pin,
-    });
-    marker.addListener("click", () => emit("select", device.device_id));
-    markers.push(marker);
-    bounds.extend(position);
-  }
-
-  initialBounds = bounds;
   if (!preserveView && locatedDevices.value.length > 0) fitAll();
 }
 
@@ -220,9 +246,16 @@ watch(theme, () => {
   if (map && window.google?.maps?.Map) createMap(window.google, true);
 });
 
+watch(
+  () => props.devices,
+  () => {
+    if (map && window.google?.maps?.Map) syncMarkers(window.google);
+  },
+);
+
 onBeforeUnmount(() => {
-  for (const marker of markers) marker.map = null;
-  markers.length = 0;
+  for (const marker of markers.values()) marker.map = null;
+  markers.clear();
   markerElements.clear();
   map = null;
 });

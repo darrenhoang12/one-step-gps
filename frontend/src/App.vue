@@ -16,15 +16,31 @@ import type { Device, DevicePreferenceUpdate } from "@/types/device";
 
 const queryClient = useQueryClient();
 const queryKey = ["devices"] as const;
+const deviceRefreshInterval = 30_000;
+const pendingWrites = ref(0);
 const { data, isPending, error, refetch } = useQuery({
   queryKey,
   queryFn: ({ signal }) => fetchDevices(signal),
   retry: false,
-  staleTime: Infinity,
-  refetchOnWindowFocus: false,
-  refetchOnReconnect: false,
+  staleTime: deviceRefreshInterval,
+  refetchInterval: computed(() =>
+    pendingWrites.value === 0 ? deviceRefreshInterval : false,
+  ),
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: computed(() =>
+    pendingWrites.value === 0 ? "always" : false,
+  ),
+  refetchOnReconnect: computed(() =>
+    pendingWrites.value === 0 ? "always" : false,
+  ),
 });
 const devices = computed(() => data.value ?? []);
+const loadError = computed(() => (data.value ? null : error.value));
+const refreshError = computed(() =>
+  data.value && error.value
+    ? "Live updates are temporarily unavailable. Showing last known positions."
+    : null,
+);
 const mapDevices = computed(() =>
   devices.value.filter((device) => !device.hidden),
 );
@@ -42,6 +58,19 @@ function selectDevice(deviceId: string) {
 
 function retryDevices() {
   void refetch();
+}
+
+async function withPausedPolling(action: () => Promise<void>) {
+  pendingWrites.value++;
+  try {
+    await queryClient.cancelQueries({ queryKey });
+    await action();
+  } finally {
+    pendingWrites.value--;
+    if (pendingWrites.value === 0) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  }
 }
 
 function actionError(cause: unknown, fallback: string): string {
@@ -163,23 +192,27 @@ async function removeIcon(deviceId: string) {
         :open="sidebarOpen"
         :selection-request="selectionRequest"
         :loading="isPending"
-        :error="error?.message ?? null"
-        :preference-error="preferenceError"
+        :error="loadError?.message ?? null"
+        :preference-error="preferenceError ?? refreshError"
         :saving-ids="savingIds"
         @select="selectDevice"
         @close="sidebarOpen = false"
         @retry="retryDevices"
-        @update-device="saveDevice"
-        @reorder="reorderDevices"
-        @upload-icon="uploadIcon"
-        @remove-icon="removeIcon"
+        @update-device="
+          (id, changes) => withPausedPolling(() => saveDevice(id, changes))
+        "
+        @reorder="(ids) => withPausedPolling(() => reorderDevices(ids))"
+        @upload-icon="
+          (id, file) => withPausedPolling(() => uploadIcon(id, file))
+        "
+        @remove-icon="(id) => withPausedPolling(() => removeIcon(id))"
       />
       <FleetMapPanel
         :devices="mapDevices"
         :selected-id="selectedId"
         :sidebar-open="sidebarOpen"
         :loading="isPending"
-        :error="!!error"
+        :error="!!loadError"
         @select="selectDevice"
         @open-sidebar="sidebarOpen = true"
       />

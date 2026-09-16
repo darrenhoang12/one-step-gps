@@ -45,8 +45,8 @@ func TestCORSMiddleware(t *testing.T) {
 				if got := response.Header().Get("Access-Control-Allow-Methods"); got != "GET, PUT, POST, DELETE" {
 					t.Errorf("allowed methods = %q, want GET, PUT, POST, DELETE", got)
 				}
-				if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type" {
-					t.Errorf("allowed headers = %q, want Authorization, Content-Type", got)
+				if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+					t.Errorf("allowed headers = %q, want Content-Type", got)
 				}
 			}
 		})
