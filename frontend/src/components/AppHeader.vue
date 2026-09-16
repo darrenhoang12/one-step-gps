@@ -1,15 +1,13 @@
-<script setup lang="ts">
-import { MapPin } from "@lucide/vue";
-</script>
-
 <template>
   <header class="topbar">
     <div class="brand-block">
-      <div class="brand-symbol"><MapPin :size="19" :stroke-width="2.6" /></div>
-      <div class="brand-name">One Step <span>GPS</span></div>
+      <img
+        class="brand-logo"
+        src="@/assets/osg-logo.png"
+        alt="OneStepGPS"
+      />
     </div>
     <div class="topbar-right">
-      <span class="demo-label"><i /> DEMO DATA</span>
       <div class="avatar">OS</div>
     </div>
   </header>
@@ -33,25 +31,13 @@ import { MapPin } from "@lucide/vue";
   display: flex;
   align-items: center;
 }
-.brand-symbol {
-  width: 37px;
-  height: 37px;
-  display: grid;
-  place-items: center;
-  border-radius: 11px;
-  background: #e96743;
-  color: #fff;
-  margin-right: 11px;
-  box-shadow: 0 4px 12px #09111d55;
-}
-.brand-name {
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  white-space: nowrap;
-}
-.brand-name span {
-  color: #ff9a75;
+.brand-logo {
+  display: block;
+  width: 190px;
+  height: auto;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .topbar-right {
@@ -89,6 +75,10 @@ import { MapPin } from "@lucide/vue";
   .topbar {
     height: 62px;
     padding: 0 16px;
+  }
+  .brand-logo {
+    width: 158px;
+    padding: 6px 9px;
   }
   .demo-label {
     display: none;

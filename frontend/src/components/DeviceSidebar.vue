@@ -10,6 +10,7 @@ import {
 } from "@lucide/vue";
 import DeviceCard from "./DeviceCard.vue";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import DeviceListControls from "./DeviceListControls.vue";
 import SummaryCard from "./SummaryCard.vue";
 import type { DeviceFilter } from "./DeviceListControls.vue";
@@ -20,8 +21,14 @@ const props = defineProps<{
   selectedId: string | null;
   open: boolean;
   selectionRequest: number;
+  loading: boolean;
+  error: string | null;
 }>();
-const emit = defineEmits<{ select: [deviceId: string]; close: [] }>();
+const emit = defineEmits<{
+  select: [deviceId: string];
+  close: [];
+  retry: [];
+}>();
 
 const search = ref("");
 const filter = ref<DeviceFilter>("all");
@@ -108,49 +115,85 @@ watch(
         </Button>
       </div>
 
-      <div class="summary-grid">
-        <SummaryCard
-          :value="devices.length"
-          label="Total devices"
-          :icon="Truck"
-          tone="blue"
-        />
-        <SummaryCard
-          :value="onlineCount"
-          label="Online now"
-          :icon="Activity"
-          tone="green"
-        />
-        <SummaryCard
-          :value="movingCount"
-          label="Moving"
-          :icon="Gauge"
-          tone="orange"
-        />
+      <div v-if="loading || !error" class="summary-grid">
+        <template v-if="loading">
+          <div v-for="index in 3" :key="index" class="summary-placeholder">
+            <Skeleton class="h-6 w-6 rounded-md" />
+            <Skeleton class="mt-2 h-5 w-10" />
+            <Skeleton class="mt-1 h-3 w-16" />
+          </div>
+        </template>
+        <template v-else>
+          <SummaryCard
+            :value="devices.length"
+            label="Total devices"
+            :icon="Truck"
+            tone="blue"
+          />
+          <SummaryCard
+            :value="onlineCount"
+            label="Online now"
+            :icon="Activity"
+            tone="green"
+          />
+          <SummaryCard
+            :value="movingCount"
+            label="Moving"
+            :icon="Gauge"
+            tone="orange"
+          />
+        </template>
       </div>
 
       <div class="list-heading">
-        <strong
-          >Your devices <span>{{ devices.length }}</span></strong
+        <strong>
+          Your devices
+          <span v-if="!loading && !error">{{ devices.length }}</span>
+        </strong>
+      </div>
+      <template v-if="loading">
+        <Skeleton class="mt-4 h-10 w-full rounded-md" />
+        <Skeleton class="my-4 h-8 w-48 rounded-md" />
+        <div class="device-list" aria-label="Loading devices" role="status">
+          <div v-for="index in 4" :key="index" class="device-placeholder">
+            <Skeleton class="h-9 w-9 rounded-md" />
+            <div class="placeholder-lines">
+              <Skeleton class="h-4 w-32" />
+              <Skeleton class="mt-2 h-3 w-24" />
+            </div>
+            <Skeleton class="mt-4 h-3 w-36" />
+          </div>
+        </div>
+      </template>
+      <div v-else-if="error" class="load-error" role="alert">
+        <strong>Could not load devices</strong>
+        <span>{{ error }}</span>
+        <Button variant="outline" size="sm" @click="emit('retry')"
+          >Try again</Button
         >
       </div>
-      <DeviceListControls v-model:search="search" v-model:filter="filter" />
-      <div ref="listElement" class="device-list">
-        <DeviceCard
-          v-for="device in filteredDevices"
-          :key="device.device_id"
-          :device="device"
-          :selected="selectedId === device.device_id"
-          :data-device-id="device.device_id"
-          @select="emit('select', $event)"
-        />
-        <div v-if="filteredDevices.length === 0" class="empty-list">
-          <Search :size="21" /><strong>No devices found</strong
-          ><span>Try another search or filter.</span>
+      <template v-else>
+        <DeviceListControls v-model:search="search" v-model:filter="filter" />
+        <div ref="listElement" class="device-list">
+          <DeviceCard
+            v-for="device in filteredDevices"
+            :key="device.device_id"
+            :device="device"
+            :selected="selectedId === device.device_id"
+            :data-device-id="device.device_id"
+            @select="emit('select', $event)"
+          />
+          <div v-if="filteredDevices.length === 0" class="empty-list">
+            <Search :size="21" /><strong>No devices found</strong
+            ><span>{{
+              devices.length
+                ? "Try another search or filter."
+                : "No devices are available."
+            }}</span>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
-    <div class="sidebar-footer"><i /> Showing sample device data</div>
   </aside>
 </template>
 
@@ -233,6 +276,40 @@ watch(
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
   margin-top: 27px;
+}
+.summary-placeholder,
+.device-placeholder {
+  padding: 13px;
+  border: 1px solid #e6ebf0;
+  border-radius: 12px;
+  background: #fff;
+}
+.device-placeholder {
+  min-height: 112px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.placeholder-lines {
+  flex: 1;
+}
+.load-error {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #e6ebf0;
+  border-radius: 12px;
+  background: #fff;
+  color: #64758a;
+  font-size: 12px;
+}
+.load-error strong {
+  color: #213248;
+  font-size: 14px;
 }
 .list-heading {
   display: flex;

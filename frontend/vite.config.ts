@@ -7,6 +7,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      '/get-devices': 'http://localhost:8080',
+    },
+  },
   plugins: [
     vue(),
     vueDevTools(),

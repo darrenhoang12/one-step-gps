@@ -24,13 +24,11 @@ func main() {
 		log.Fatalf("connecting to database: %v", err)
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Hello from Go")
-	})
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/get-devices", getDevices)
-	http.HandleFunc("/preferences", setUserPreferences(db))
+	mux.HandleFunc("/get-devices", getDevices)
+	mux.HandleFunc("/preferences", setUserPreferences(db))
 
 	fmt.Println("Server running at http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(os.Getenv("CORS_ALLOWED_ORIGIN"), mux)))
 }

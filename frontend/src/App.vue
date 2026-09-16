@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
 import AppHeader from "@/components/AppHeader.vue";
 import DeviceSidebar from "@/components/DeviceSidebar.vue";
 import FleetMapPanel from "@/components/FleetMapPanel.vue";
-import mockDevices from "@/data/mockDevices.json";
-import type { Device } from "@/types/device";
+import { fetchDevices } from "@/lib/devicesApi";
 
-const devices: Device[] = mockDevices;
+const { data, isPending, error, refetch } = useQuery({
+  queryKey: ["devices"],
+  queryFn: ({ signal }) => fetchDevices(signal),
+  retry: false,
+  staleTime: Infinity,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const devices = computed(() => data.value ?? []);
 const sidebarOpen = ref(true);
 const selectedId = ref<string | null>(null);
 const selectionRequest = ref(0);
@@ -15,6 +23,10 @@ function selectDevice(deviceId: string) {
   selectedId.value = deviceId;
   sidebarOpen.value = true;
   selectionRequest.value += 1;
+}
+
+function retryDevices() {
+  void refetch();
 }
 </script>
 
@@ -27,13 +39,18 @@ function selectDevice(deviceId: string) {
         :selected-id="selectedId"
         :open="sidebarOpen"
         :selection-request="selectionRequest"
+        :loading="isPending"
+        :error="error?.message ?? null"
         @select="selectDevice"
         @close="sidebarOpen = false"
+        @retry="retryDevices"
       />
       <FleetMapPanel
         :devices="devices"
         :selected-id="selectedId"
         :sidebar-open="sidebarOpen"
+        :loading="isPending"
+        :error="!!error"
         @select="selectDevice"
         @open-sidebar="sidebarOpen = true"
       />

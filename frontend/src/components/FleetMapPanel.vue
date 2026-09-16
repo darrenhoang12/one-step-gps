@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { ChevronRight, Crosshair, MapPin, Menu } from "@lucide/vue";
 import DeviceMap from "./DeviceMap.vue";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import SelectedDeviceCard from "./SelectedDeviceCard.vue";
 import type { Device } from "@/types/device";
 
@@ -10,6 +11,8 @@ const props = defineProps<{
   devices: Device[];
   selectedId: string | null;
   sidebarOpen: boolean;
+  loading: boolean;
+  error: boolean;
 }>();
 const emit = defineEmits<{ select: [deviceId: string]; openSidebar: [] }>();
 const mapRef = ref<InstanceType<typeof DeviceMap> | null>(null);
@@ -27,12 +30,17 @@ const selectedDevice = computed(
     aria-label="Device map"
   >
     <DeviceMap
+      v-if="!loading && !error"
       ref="mapRef"
       :devices="devices"
       :selected-id="selectedId"
       :sidebar-open="sidebarOpen"
       @select="emit('select', $event)"
     />
+    <div v-else class="map-loading" role="status" :aria-label="loading ? 'Loading map' : 'Map unavailable'">
+      <Skeleton v-if="loading" class="h-full w-full rounded-none" />
+      <span v-else>Map unavailable while devices could not be loaded.</span>
+    </div>
     <div class="map-top-overlay">
       <Button
         v-if="!sidebarOpen"
@@ -47,7 +55,7 @@ const selectedDevice = computed(
         <span class="map-heading-icon"><MapPin :size="18" /></span>
         <div>
           <strong>Fleet map</strong
-          ><small>{{ devices.length }} devices across California</small>
+          ><small>{{ loading ? "Loading devices" : error ? "Devices unavailable" : `${devices.length} devices` }}</small>
         </div>
       </div>
     </div>
@@ -60,6 +68,7 @@ const selectedDevice = computed(
         class="map-action"
         title="Fit all devices"
         aria-label="Fit all devices on map"
+        :disabled="loading || error"
         @click="mapRef?.fitAll()"
       >
         <Crosshair :size="17" /><span>Fit all</span>
@@ -77,6 +86,14 @@ const selectedDevice = computed(
   min-width: 0;
   overflow: hidden;
   background: #e5e8dc;
+}
+.map-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #607487;
+  font-size: 13px;
 }
 .map-top-overlay,
 .map-bottom-overlay {
