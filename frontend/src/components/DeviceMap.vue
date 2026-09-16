@@ -250,6 +250,10 @@ watch(
   () => props.devices,
   (_devices, previousDevices) => {
     if (!map || !window.google?.maps?.Map) return;
+    const hadLocations = previousDevices.some(
+      (device) =>
+        typeof device.lat === "number" && typeof device.lng === "number",
+    );
     syncMarkers(window.google);
     const selected = locatedDevices.value.find(
       (device) => device.device_id === props.selectedId,
@@ -261,7 +265,12 @@ watch(
       selected &&
       (selected.lat !== previous?.lat || selected.lng !== previous?.lng)
     ) {
-      focusDevice(selected.device_id, false);
+      focusDevice(
+        selected.device_id,
+        previous?.lat == null || previous?.lng == null,
+      );
+    } else if (!selected && !hadLocations && locatedDevices.value.length > 0) {
+      fitAll();
     }
   },
 );
