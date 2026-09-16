@@ -1,3 +1,10 @@
+<script setup lang="ts">
+import { Moon, Sun } from "@lucide/vue";
+import { useTheme } from "@/lib/theme";
+
+const { theme, toggleTheme } = useTheme();
+</script>
+
 <template>
   <header class="topbar">
     <div class="brand-block">
@@ -8,7 +15,17 @@
       />
     </div>
     <div class="topbar-right">
-      <div class="avatar">OS</div>
+      <button
+        class="theme-toggle"
+        type="button"
+        :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`"
+        :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`"
+        :aria-pressed="theme === 'dark'"
+        @click="toggleTheme"
+      >
+        <Sun v-if="theme === 'dark'" :size="18" />
+        <Moon v-else :size="18" />
+      </button>
     </div>
   </header>
 </template>
@@ -59,17 +76,26 @@
   background: #f1ba63;
   box-shadow: 0 0 0 4px #f1ba6324;
 }
-.avatar {
+.theme-toggle {
   display: grid;
   place-items: center;
-  width: 35px;
-  height: 35px;
-  border: 1px solid #7b8c9e;
-  border-radius: 50%;
-  background: #42566d;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #526a82;
+  border-radius: 10px;
+  background: #243b54;
+  color: #f7c96f;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s;
+}
+.theme-toggle:hover {
+  border-color: #7e98b2;
+  background: #304a65;
+  transform: translateY(-1px);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid #76b8ee;
+  outline-offset: 2px;
 }
 @media (max-width: 760px) {
   .topbar {

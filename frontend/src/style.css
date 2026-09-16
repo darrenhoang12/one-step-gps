@@ -119,5 +119,149 @@
   }
   body {
     @apply bg-background text-foreground;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+/* The application predates the shadcn color tokens, so these rules bridge its
+   custom surfaces into the same class-based dark theme. */
+.dark .app-shell {
+  background: #0f1722;
+  color: #e5edf5;
+}
+.dark .sidebar {
+  border-color: #304154;
+  background: #162231;
+  box-shadow: 0 18px 55px #02070db8, 0 2px 8px #02070d80;
+}
+.dark .device-card,
+.dark .summary-card,
+.dark .summary-placeholder,
+.dark .device-placeholder,
+.dark .load-error {
+  border-color: #33465a;
+  background: #1c2a3a;
+  box-shadow: 0 3px 12px #02070d4d;
+}
+.dark .device-card:hover,
+.dark .device-card.selected {
+  border-color: #628db2;
+}
+.dark .device-title strong,
+.dark .load-error strong,
+.dark .selected-card strong,
+.dark .crop-dialog h2 {
+  color: #e9f1f8;
+}
+.dark .device-title small,
+.dark .card-data,
+.dark .card-location,
+.dark .saving-label,
+.dark .list-heading small,
+.dark .crop-dialog p,
+.dark .crop-dialog footer > span {
+  color: #9babbc;
+}
+.dark .device-icon,
+.dark .summary-icon.blue,
+.dark .map-heading-icon {
+  background: #263c52;
+  color: #8dc3ed;
+}
+.dark .card-divider,
+.dark .card-actions,
+.dark .name-editor,
+.dark .crop-dialog footer {
+  border-color: #34465a;
+}
+.dark .search-box,
+.dark .search-box input {
+  border-color: #34485c;
+  background: #1c2a3a;
+  color: #e5edf5;
+}
+.dark .filter-row {
+  border-color: #34485c;
+  background: #111c29;
+}
+.dark .filter-row [data-slot="toggle-group-item"] {
+  color: #a9b8c8;
+}
+.dark .filter-row [data-slot="toggle-group-item"].active {
+  background: #47769f;
+  color: #fff;
+}
+.dark .filter-row [data-slot="toggle-group-item"]:not(.active):hover,
+.dark .icon-button:hover {
+  background: #293b4e;
+  color: #dce9f4;
+}
+.dark .icon-button {
+  border-color: #3a4d61;
+  background: #1c2a3a;
+  color: #aab9c9;
+}
+.dark .list-heading strong span {
+  background: #29394b;
+  color: #adbbca;
+}
+.dark .preference-error {
+  border-color: #714a40;
+  background: #3a2524;
+  color: #f1afa0;
+}
+.dark .empty-list {
+  border-color: #3b4d60;
+  color: #8193a5;
+}
+.dark .empty-list strong {
+  color: #b7c5d3;
+}
+.dark .selected-card,
+.dark .map-heading,
+.dark .reopen-button,
+.dark .map-action,
+.dark .map-legend {
+  border-color: #415368;
+  background: #182637e8;
+  color: #dfe9f3;
+  box-shadow: 0 10px 30px #02070d70;
+}
+.dark .map-panel {
+  background: #172334;
+}
+.dark .map-loading {
+  color: #a4b3c2;
+}
+.dark .selected-main span,
+.dark .selected-stats > div,
+.dark .selected-stats small,
+.dark .map-heading small,
+.dark .map-legend {
+  color: #a4b3c2;
+}
+.dark .selected-icon {
+  background: #263c52;
+  color: #8dc3ed;
+}
+.dark .selected-stats {
+  border-color: #3b4d61;
+}
+.dark .reopen-button:hover,
+.dark .map-action:hover {
+  background: #26384b;
+}
+.dark .crop-dialog {
+  border-color: #3b4d61;
+  background: #172433;
+  box-shadow: 0 24px 70px #02070dcc;
+}
+.dark .close-button {
+  color: #a8b6c5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
   }
 }

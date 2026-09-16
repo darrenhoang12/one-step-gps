@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { env } from "@/lib/env";
+import { useTheme } from "@/lib/theme";
 import type { Device } from "@/types/device";
 
 type LatLng = { lat: number; lng: number };
@@ -13,10 +14,13 @@ type MapInstance = {
   panTo: (position: LatLng) => void;
   panBy: (x: number, y: number) => void;
   setZoom: (zoom: number) => void;
+  getCenter: () => { toJSON: () => LatLng } | undefined;
+  getZoom: () => number | undefined;
 };
 type BoundsInstance = { extend: (position: LatLng) => void };
 type MarkerInstance = {
   addListener: (event: string, callback: () => void) => void;
+  map: MapInstance | null;
 };
 type MapsApi = {
   maps: {
@@ -49,10 +53,12 @@ const props = defineProps<{
   sidebarOpen: boolean;
 }>();
 const emit = defineEmits<{ select: [deviceId: string] }>();
+const { theme } = useTheme();
 
 const mapState = ref<"loading" | "ready" | "error">("loading");
 const mapElement = ref<HTMLElement | null>(null);
 const markerElements = new Map<string, HTMLElement>();
+const markers: MarkerInstance[] = [];
 let map: MapInstance | null = null;
 let initialBounds: BoundsInstance | null = null;
 let mapsPromise: Promise<MapsApi> | null = null;
@@ -140,53 +146,78 @@ function previewPosition(device: Device & LatLng) {
   };
 }
 
+function createMap(google: MapsApi, preserveView = false) {
+  if (!mapElement.value) return;
+  const center = preserveView ? map?.getCenter()?.toJSON() : undefined;
+  const zoom = preserveView ? map?.getZoom() : undefined;
+  for (const marker of markers) marker.map = null;
+  markers.length = 0;
+  markerElements.clear();
+  mapElement.value.replaceChildren();
+
+  map = new google.maps.Map(mapElement.value, {
+    center: center ?? { lat: 36.1, lng: -119.7 },
+    zoom: zoom ?? 6,
+    mapId: env.googleMapsMapId,
+    colorScheme: theme.value === "dark" ? "DARK" : "LIGHT",
+    backgroundColor: theme.value === "dark" ? "#172334" : "#e7e8db",
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    gestureHandling: "greedy",
+  });
+
+  const bounds = new google.maps.LatLngBounds();
+  for (const device of locatedDevices.value) {
+    const position = { lat: device.lat, lng: device.lng };
+    const pin = document.createElement("div");
+    pin.className = `google-device-pin ${device.online ? "is-online" : "is-offline"}`;
+    pin.classList.toggle(
+      "is-selected",
+      device.device_id === props.selectedId,
+    );
+    pin.textContent = device.display_name.slice(0, 2).toUpperCase();
+    pin.setAttribute("aria-label", device.display_name);
+    markerElements.set(device.device_id, pin);
+
+    const marker = new google.maps.marker.AdvancedMarkerElement({
+      map,
+      position,
+      title: device.display_name,
+      content: pin,
+    });
+    marker.addListener("click", () => emit("select", device.device_id));
+    markers.push(marker);
+    bounds.extend(position);
+  }
+
+  initialBounds = bounds;
+  if (!preserveView && locatedDevices.value.length > 0) fitAll();
+}
+
 onMounted(async () => {
   if (!mapElement.value) return;
 
   try {
     const google = await loadMaps(env.googleMapsApiKey);
     if (!mapElement.value) return;
-
-    map = new google.maps.Map(mapElement.value, {
-      center: { lat: 36.1, lng: -119.7 },
-      zoom: 6,
-      mapId: env.googleMapsMapId,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      gestureHandling: "greedy",
-    });
-
-    const bounds = new google.maps.LatLngBounds();
-    for (const device of locatedDevices.value) {
-      const position = { lat: device.lat, lng: device.lng };
-      const pin = document.createElement("div");
-      pin.className = `google-device-pin ${device.online ? "is-online" : "is-offline"}`;
-      pin.classList.toggle(
-        "is-selected",
-        device.device_id === props.selectedId,
-      );
-      pin.textContent = device.display_name.slice(0, 2).toUpperCase();
-      pin.setAttribute("aria-label", device.display_name);
-      markerElements.set(device.device_id, pin);
-
-      const marker = new google.maps.marker.AdvancedMarkerElement({
-        map,
-        position,
-        title: device.display_name,
-        content: pin,
-      });
-      marker.addListener("click", () => emit("select", device.device_id));
-      bounds.extend(position);
-    }
-
-    initialBounds = bounds;
-    if (locatedDevices.value.length > 0) fitAll();
+    createMap(google);
     mapState.value = "ready";
   } catch (error) {
     console.error("Google Maps failed to load:", error);
     mapState.value = "error";
   }
+});
+
+watch(theme, () => {
+  if (map && window.google?.maps?.Map) createMap(window.google, true);
+});
+
+onBeforeUnmount(() => {
+  for (const marker of markers) marker.map = null;
+  markers.length = 0;
+  markerElements.clear();
+  map = null;
 });
 
 watch(
@@ -469,6 +500,27 @@ defineExpose({ fitAll });
   line-height: 1.5;
   color: #657484;
 }
+:global(.dark) .map-preview {
+  background: #1c2a35;
+  background-image:
+    linear-gradient(27deg, transparent 48%, #334450 49%, #334450 51%, transparent 52%),
+    linear-gradient(152deg, transparent 47%, #243d46 48%, #243d46 52%, transparent 53%);
+}
+:global(.dark) .terrain-one { background: #263d42; }
+:global(.dark) .terrain-two { background: #2b4341; }
+:global(.dark) .terrain-three { background: #243a45; }
+:global(.dark) .road {
+  background: #4b5050;
+  border-color: #51615f;
+  box-shadow: 0 0 0 5px #394b4b;
+}
+:global(.dark) .map-region { color: #8ea9ab; }
+:global(.dark) .map-preview-notice {
+  background: #182637ed;
+  box-shadow: 0 10px 38px #07101988;
+  color: #e5edf5;
+}
+:global(.dark) .map-preview-notice p { color: #a4b3c2; }
 :global(.google-device-pin) {
   display: grid;
   place-items: center;
