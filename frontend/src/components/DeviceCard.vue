@@ -1,12 +1,40 @@
 <script setup lang="ts">
-import { Clock3, Gauge, MapPin, Truck } from "@lucide/vue";
+import { Archive, ArchiveRestore, Clock3, Eye, EyeOff, Gauge, GripVertical, MapPin, Pencil, RotateCcw, Truck, Upload } from "@lucide/vue";
+import { ref } from "vue";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { formatCoordinates, formatReportedAt } from "@/lib/deviceFormat";
 import type { Device } from "@/types/device";
 
-defineProps<{ device: Device; selected?: boolean }>();
-const emit = defineEmits<{ select: [deviceId: string] }>();
+const props = defineProps<{ device: Device; selected?: boolean; draggable?: boolean; saving?: boolean }>();
+const emit = defineEmits<{
+  select: [deviceId: string];
+  update: [deviceId: string, changes: Partial<Device>];
+  upload: [deviceId: string, file: File];
+  dragStart: [deviceId: string];
+  drop: [deviceId: string];
+}>();
+const editing = ref(false);
+const customName = ref("");
+const fileInput = ref<HTMLInputElement | null>(null);
+
+function beginEditing() {
+  customName.value = props.device.custom_display_name ?? props.device.display_name;
+  editing.value = true;
+}
+
+function saveName() {
+  emit("update", props.device.device_id, { custom_display_name: customName.value.trim() || null });
+  editing.value = false;
+}
+
+function chooseFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (file) emit("upload", props.device.device_id, file);
+  (event.target as HTMLInputElement).value = "";
+}
 </script>
 
 <template>
@@ -16,12 +44,20 @@ const emit = defineEmits<{ select: [deviceId: string] }>();
     role="button"
     tabindex="0"
     :aria-pressed="selected"
+    :draggable="draggable"
     @click="emit('select', device.device_id)"
     @keydown.enter="emit('select', device.device_id)"
     @keydown.space.prevent="emit('select', device.device_id)"
+    @dragstart="emit('dragStart', device.device_id)"
+    @dragover.prevent
+    @drop.prevent="emit('drop', device.device_id)"
   >
     <span class="card-top">
-      <span class="device-icon"><Truck :size="19" /></span>
+      <GripVertical v-if="draggable" class="drag-handle" :size="16" />
+      <span class="device-icon">
+        <img v-if="device.icon_url" :src="device.icon_url" alt="" />
+        <Truck v-else :size="19" />
+      </span>
       <span class="device-title"
         ><strong>{{ device.display_name }}</strong
         ><small>{{ device.model }}</small></span
@@ -41,6 +77,34 @@ const emit = defineEmits<{ select: [deviceId: string] }>();
     <span class="card-location"
       ><MapPin :size="13" /> {{ formatCoordinates(device) }}</span
     >
+    <form v-if="editing" class="name-editor" @click.stop @submit.prevent="saveName">
+      <Input v-model="customName" maxlength="80" aria-label="Custom device name" autofocus />
+      <Button type="submit" size="sm">Save</Button>
+      <Button type="button" size="sm" variant="ghost" @click="editing = false">Cancel</Button>
+    </form>
+    <span v-else class="card-actions" @click.stop>
+      <Button variant="ghost" size="icon-sm" title="Rename device" @click="beginEditing"><Pencil :size="14" /></Button>
+      <Button
+        v-if="device.custom_display_name"
+        variant="ghost"
+        size="icon-sm"
+        title="Reset to original name"
+        aria-label="Reset to original device name"
+        :disabled="saving"
+        @click="emit('update', device.device_id, { custom_display_name: null })"
+      >
+        <RotateCcw :size="14" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" :title="device.hidden ? 'Show device' : 'Hide device'" @click="emit('update', device.device_id, { hidden: !device.hidden })">
+        <Eye v-if="device.hidden" :size="14" /><EyeOff v-else :size="14" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" :title="device.archived ? 'Restore device' : 'Archive device'" @click="emit('update', device.device_id, { archived: !device.archived })">
+        <ArchiveRestore v-if="device.archived" :size="14" /><Archive v-else :size="14" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" title="Upload device icon" @click="fileInput?.click()"><Upload :size="14" /></Button>
+      <input ref="fileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="chooseFile" />
+      <span v-if="saving" class="saving-label">Saving…</span>
+    </span>
   </Card>
 </template>
 
@@ -72,6 +136,16 @@ const emit = defineEmits<{ select: [deviceId: string] }>();
     inset 3px 0 #e66843,
     0 5px 16px #2149711a;
 }
+.device-card[draggable="true"] {
+  cursor: grab;
+}
+.device-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+.drag-handle {
+  flex: none;
+  color: #9aa8b6;
+}
 .device-card:focus-visible {
   outline: 2px solid #41749f;
   outline-offset: 2px;
@@ -91,6 +165,12 @@ const emit = defineEmits<{ select: [deviceId: string] }>();
   border-radius: 9px;
   background: #e8eff6;
   color: #3d6488;
+}
+.device-icon img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 .device-title {
   display: flex;
@@ -157,6 +237,28 @@ const emit = defineEmits<{ select: [deviceId: string] }>();
   display: flex;
   align-items: center;
   gap: 5px;
+}
+.card-actions,
+.name-editor {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #edf1f4;
+}
+.name-editor input {
+  height: 32px;
+  font-size: 11px;
+}
+.file-input {
+  display: none;
+}
+.saving-label {
+  margin-left: auto;
+  color: #7c8b9d;
+  font-size: 9px;
+  font-weight: 700;
 }
 .card-location {
   margin-top: 10px;

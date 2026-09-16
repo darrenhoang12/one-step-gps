@@ -23,17 +23,23 @@ const props = defineProps<{
   selectionRequest: number;
   loading: boolean;
   error: string | null;
+  preferenceError: string | null;
+  savingIds: Set<string>;
 }>();
 const emit = defineEmits<{
   select: [deviceId: string];
   close: [];
   retry: [];
+  updateDevice: [deviceId: string, changes: Partial<Device>];
+  reorder: [deviceIds: string[]];
+  uploadIcon: [deviceId: string, file: File];
 }>();
 
 const search = ref("");
 const filter = ref<DeviceFilter>("all");
 const scrollContainer = ref<HTMLElement | null>(null);
 const listElement = ref<HTMLElement | null>(null);
+const draggedId = ref<string | null>(null);
 const onlineCount = computed(
   () => props.devices.filter((device) => device.online).length,
 );
@@ -44,16 +50,44 @@ const movingCount = computed(
 const filteredDevices = computed(() =>
   props.devices.filter((device) => {
     const query = search.value.trim().toLowerCase();
+    const matchesState =
+      filter.value === "hidden"
+        ? device.hidden && !device.archived
+        : filter.value === "archived"
+          ? device.archived
+          : !device.hidden && !device.archived &&
+            (filter.value === "all" ||
+              (filter.value === "online" ? device.online : !device.online));
     return (
       (!query ||
-        `${device.display_name} ${device.model}`
+        `${device.display_name} ${device.original_display_name} ${device.model}`
           .toLowerCase()
           .includes(query)) &&
-      (filter.value === "all" ||
-        (filter.value === "online" ? device.online : !device.online))
+      matchesState
     );
   }),
 );
+const canReorder = computed(() => filter.value === "all" && !search.value.trim());
+
+function dropDevice(targetId: string) {
+  const sourceId = draggedId.value;
+  draggedId.value = null;
+  if (!sourceId || sourceId === targetId || !canReorder.value) return;
+  const ordered = filteredDevices.value.map((device) => device.device_id);
+  const sourceIndex = ordered.indexOf(sourceId);
+  const targetIndex = ordered.indexOf(targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+  ordered.splice(targetIndex, 0, ...ordered.splice(sourceIndex, 1));
+  emit("reorder", ordered);
+}
+
+function updateDevice(deviceId: string, changes: Partial<Device>) {
+  emit("updateDevice", deviceId, changes);
+}
+
+function uploadIcon(deviceId: string, file: File) {
+  emit("uploadIcon", deviceId, file);
+}
 
 watch(
   () => props.selectionRequest,
@@ -151,6 +185,9 @@ watch(
           <span v-if="!loading && !error">{{ devices.length }}</span>
         </strong>
       </div>
+      <div v-if="preferenceError" class="preference-error" role="alert">
+        {{ preferenceError }}
+      </div>
       <template v-if="loading">
         <Skeleton class="mt-4 h-10 w-full rounded-md" />
         <Skeleton class="my-4 h-8 w-48 rounded-md" />
@@ -181,7 +218,13 @@ watch(
             :device="device"
             :selected="selectedId === device.device_id"
             :data-device-id="device.device_id"
+            :draggable="canReorder"
+            :saving="savingIds.has(device.device_id)"
             @select="emit('select', $event)"
+            @update="updateDevice"
+            @upload="uploadIcon"
+            @drag-start="draggedId = $event"
+            @drop="dropDevice"
           />
           <div v-if="filteredDevices.length === 0" class="empty-list">
             <Search :size="21" /><strong>No devices found</strong
@@ -310,6 +353,15 @@ watch(
 .load-error strong {
   color: #213248;
   font-size: 14px;
+}
+.preference-error {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid #efc1b5;
+  border-radius: 8px;
+  background: #fff3ef;
+  color: #a44a31;
+  font-size: 11px;
 }
 .list-heading {
   display: flex;

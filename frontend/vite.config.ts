@@ -10,6 +10,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/get-devices': 'http://localhost:8080',
+      '/preferences': 'http://localhost:8080',
+      '/uploads': 'http://localhost:8080',
     },
   },
   plugins: [

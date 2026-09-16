@@ -25,9 +25,16 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	uploadDir := os.Getenv("UPLOAD_DIR")
+	if uploadDir == "" {
+		uploadDir = "uploads"
+	}
 
-	mux.HandleFunc("/get-devices", getDevices)
-	mux.HandleFunc("/preferences", setUserPreferences(db))
+	mux.HandleFunc("/get-devices", getDevices(db))
+	mux.HandleFunc("/preferences", preferencesHandler(db))
+	mux.HandleFunc("/preferences/order", deviceOrderHandler(db))
+	mux.HandleFunc("/preferences/icon", deviceIconHandler(db, uploadDir))
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadDir))))
 
 	fmt.Println("Server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(os.Getenv("CORS_ALLOWED_ORIGIN"), mux)))
