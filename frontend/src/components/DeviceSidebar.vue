@@ -41,6 +41,8 @@ const filter = ref<DeviceFilter>("all");
 const scrollContainer = ref<HTMLElement | null>(null);
 const listElement = ref<HTMLElement | null>(null);
 const draggedId = ref<string | null>(null);
+const dropTargetId = ref<string | null>(null);
+const dropPosition = ref<"before" | "after" | null>(null);
 const onlineCount = computed(
   () => props.devices.filter((device) => device.online).length,
 );
@@ -70,7 +72,7 @@ const canReorder = computed(() => filter.value === "all" && !search.value.trim()
 
 function dropDevice(targetId: string) {
   const sourceId = draggedId.value;
-  draggedId.value = null;
+  clearDragState();
   if (!sourceId || sourceId === targetId || !canReorder.value) return;
   const ordered = filteredDevices.value.map((device) => device.device_id);
   const sourceIndex = ordered.indexOf(sourceId);
@@ -78,6 +80,31 @@ function dropDevice(targetId: string) {
   if (sourceIndex < 0 || targetIndex < 0) return;
   ordered.splice(targetIndex, 0, ...ordered.splice(sourceIndex, 1));
   emit("reorder", ordered);
+}
+
+function startDragging(deviceId: string) {
+  draggedId.value = deviceId;
+  dropTargetId.value = null;
+  dropPosition.value = null;
+}
+
+function enterDropTarget(targetId: string) {
+  const sourceId = draggedId.value;
+  if (!sourceId || sourceId === targetId) {
+    dropTargetId.value = null;
+    dropPosition.value = null;
+    return;
+  }
+  const ordered = filteredDevices.value.map((device) => device.device_id);
+  dropTargetId.value = targetId;
+  dropPosition.value =
+    ordered.indexOf(sourceId) < ordered.indexOf(targetId) ? "after" : "before";
+}
+
+function clearDragState() {
+  draggedId.value = null;
+  dropTargetId.value = null;
+  dropPosition.value = null;
 }
 
 function updateDevice(deviceId: string, changes: Partial<Device>) {
@@ -211,21 +238,27 @@ watch(
       <template v-else>
         <DeviceListControls v-model:search="search" v-model:filter="filter" />
         <div ref="listElement" class="device-list">
-          <DeviceCard
-            v-for="device in filteredDevices"
-            :key="device.device_id"
-            :device="device"
-            :selected="selectedId === device.device_id"
-            :data-device-id="device.device_id"
-            :draggable="canReorder"
-            :saving="savingIds.has(device.device_id)"
-            @select="emit('select', $event)"
-            @update="updateDevice"
-            @upload="uploadIcon"
-            @remove-icon="emit('removeIcon', $event)"
-            @drag-start="draggedId = $event"
-            @drop="dropDevice"
-          />
+          <TransitionGroup name="device-order">
+            <DeviceCard
+              v-for="device in filteredDevices"
+              :key="device.device_id"
+              :device="device"
+              :selected="selectedId === device.device_id"
+              :data-device-id="device.device_id"
+              :draggable="canReorder"
+              :dragging="draggedId === device.device_id"
+              :drop-position="dropTargetId === device.device_id ? dropPosition : null"
+              :saving="savingIds.has(device.device_id)"
+              @select="emit('select', $event)"
+              @update="updateDevice"
+              @upload="uploadIcon"
+              @remove-icon="emit('removeIcon', $event)"
+              @drag-start="startDragging"
+              @drag-enter="enterDropTarget"
+              @drag-end="clearDragState"
+              @drop="dropDevice"
+            />
+          </TransitionGroup>
           <div v-if="filteredDevices.length === 0" class="empty-list">
             <Search :size="21" /><strong>No devices found</strong
             ><span>{{
@@ -389,6 +422,9 @@ watch(
   display: grid;
   gap: 10px;
 }
+:deep(.device-order-move) {
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
 .empty-list {
   display: flex;
   flex-direction: column;
@@ -430,6 +466,9 @@ watch(
   .sidebar,
   .sidebar-scroll,
   .sidebar-footer {
+    transition: none;
+  }
+  :deep(.device-order-move) {
     transition: none;
   }
 }

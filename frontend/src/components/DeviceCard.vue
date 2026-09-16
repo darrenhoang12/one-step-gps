@@ -9,13 +9,22 @@ import ImageCropDialog from "@/components/ImageCropDialog.vue";
 import { formatCoordinates, formatReportedAt } from "@/lib/deviceFormat";
 import type { Device } from "@/types/device";
 
-const props = defineProps<{ device: Device; selected?: boolean; draggable?: boolean; saving?: boolean }>();
+const props = defineProps<{
+  device: Device;
+  selected?: boolean;
+  draggable?: boolean;
+  dragging?: boolean;
+  dropPosition?: "before" | "after" | null;
+  saving?: boolean;
+}>();
 const emit = defineEmits<{
   select: [deviceId: string];
   update: [deviceId: string, changes: Partial<Device>];
   upload: [deviceId: string, file: File];
   removeIcon: [deviceId: string];
   dragStart: [deviceId: string];
+  dragEnter: [deviceId: string];
+  dragEnd: [];
   drop: [deviceId: string];
 }>();
 const editing = ref(false);
@@ -49,12 +58,24 @@ function uploadCrop(file: File) {
   imageToCrop.value = null;
   emit("upload", props.device.device_id, file);
 }
+
+function startDrag(event: DragEvent) {
+  if (!props.draggable) return;
+  event.dataTransfer?.setData("text/plain", props.device.device_id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  emit("dragStart", props.device.device_id);
+}
 </script>
 
 <template>
   <Card
     class="device-card"
-    :class="{ selected }"
+    :class="{
+      selected,
+      'is-dragging': dragging,
+      'drop-before': dropPosition === 'before',
+      'drop-after': dropPosition === 'after',
+    }"
     role="button"
     tabindex="0"
     :aria-pressed="selected"
@@ -62,8 +83,10 @@ function uploadCrop(file: File) {
     @click="emit('select', device.device_id)"
     @keydown.enter="emit('select', device.device_id)"
     @keydown.space.prevent="emit('select', device.device_id)"
-    @dragstart="emit('dragStart', device.device_id)"
+    @dragstart="startDrag"
+    @dragenter.prevent="emit('dragEnter', device.device_id)"
     @dragover.prevent
+    @dragend="emit('dragEnd')"
     @drop.prevent="emit('drop', device.device_id)"
   >
     <span class="card-top">
@@ -132,6 +155,7 @@ function uploadCrop(file: File) {
 
 <style scoped>
 .device-card {
+  position: relative;
   width: 100%;
   gap: 0;
   padding: 15px;
@@ -145,7 +169,8 @@ function uploadCrop(file: File) {
   transition:
     border-color 0.18s,
     box-shadow 0.18s,
-    transform 0.18s;
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s;
 }
 .device-card:hover {
   border-color: #9cb5cf;
@@ -163,6 +188,44 @@ function uploadCrop(file: File) {
 }
 .device-card[draggable="true"]:active {
   cursor: grabbing;
+}
+.device-card.is-dragging {
+  z-index: 2;
+  opacity: 0.38;
+  border-color: #8da9c1;
+  box-shadow: 0 12px 28px #183a5c24;
+  transform: scale(0.975);
+}
+.device-card.drop-before::before,
+.device-card.drop-after::after {
+  position: absolute;
+  z-index: 3;
+  right: 4px;
+  left: 4px;
+  height: 3px;
+  border-radius: 999px;
+  background: #e56843;
+  box-shadow: 0 0 0 4px #f8ded6;
+  content: "";
+  pointer-events: none;
+  animation: drop-indicator 0.18s ease-out;
+}
+.device-card.drop-before::before {
+  top: -7px;
+}
+.device-card.drop-after::after {
+  bottom: -7px;
+}
+.device-card.drop-before,
+.device-card.drop-after {
+  border-color: #9ab3c8;
+  transform: translateY(-1px);
+}
+@keyframes drop-indicator {
+  from {
+    opacity: 0;
+    transform: scaleX(0.65);
+  }
 }
 .drag-handle {
   flex: none;
@@ -292,5 +355,13 @@ function uploadCrop(file: File) {
   margin-top: 10px;
   color: #a0aab4;
   font-size: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .device-card,
+  .device-card.drop-before::before,
+  .device-card.drop-after::after {
+    transition: none;
+    animation: none;
+  }
 }
 </style>
