@@ -18,7 +18,6 @@ export interface Device {
 
 export interface DevicePreferenceUpdate {
   device_id: string;
-  sort_order: number | null;
   hidden: boolean;
   custom_display_name: string | null;
 }

@@ -11,6 +11,7 @@ import {
   updateDevicePreferences,
   uploadDeviceIcon,
 } from "@/lib/devicesApi";
+import { reorderVisibleDevices } from "@/lib/deviceOrder";
 import type { Device, DevicePreferenceUpdate } from "@/types/device";
 
 const queryClient = useQueryClient();
@@ -50,7 +51,6 @@ function actionError(cause: unknown, fallback: string): string {
 function preferenceFor(device: Device): DevicePreferenceUpdate {
   return {
     device_id: device.device_id,
-    sort_order: device.sort_order,
     hidden: device.hidden,
     custom_display_name: device.custom_display_name,
   };
@@ -87,21 +87,12 @@ async function saveDevice(deviceId: string, changes: Partial<Device>) {
 
 async function reorderDevices(deviceIds: string[]) {
   const previous = queryClient.getQueryData<Device[]>(queryKey) ?? [];
-  const positions = new Map(deviceIds.map((id, index) => [id, index]));
-  const reordered = [...previous]
-    .sort(
-      (left, right) =>
-        (positions.get(left.device_id) ?? Number.MAX_SAFE_INTEGER) -
-        (positions.get(right.device_id) ?? Number.MAX_SAFE_INTEGER),
-    )
-    .map((device) => ({
-      ...device,
-      sort_order: positions.get(device.device_id) ?? device.sort_order,
-    }));
+  const reordered = reorderVisibleDevices(previous, deviceIds);
+  if (!reordered) return;
   queryClient.setQueryData(queryKey, reordered);
   preferenceError.value = null;
   try {
-    await updateDeviceOrder(deviceIds);
+    await updateDeviceOrder(reordered.map((device) => device.device_id));
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
     preferenceError.value = actionError(cause, "Could not save device order");

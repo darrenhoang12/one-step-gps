@@ -29,7 +29,7 @@ const (
 
 type devicePreferences struct {
 	DeviceID          string  `json:"device_id"`
-	SortOrder         *int    `json:"sort_order"`
+	SortOrder         *int    `json:"-"`
 	Hidden            bool    `json:"hidden"`
 	CustomDisplayName *string `json:"custom_display_name"`
 	IconStoragePath   *string `json:"-"`
@@ -51,23 +51,21 @@ func preferencesHandler(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		prefs.DeviceID = strings.TrimSpace(prefs.DeviceID)
-		if prefs.DeviceID == "" || (prefs.SortOrder != nil && *prefs.SortOrder < 0) {
-			http.Error(w, "device_id is required and sort_order must be nonnegative", http.StatusBadRequest)
+		if prefs.DeviceID == "" {
+			http.Error(w, "device_id is required", http.StatusBadRequest)
 			return
 		}
 		prefs.CustomDisplayName = cleanOptionalString(prefs.CustomDisplayName)
 
 		_, err := db.Exec(r.Context(), `
 			INSERT INTO device_preferences
-				(device_id, sort_order, hidden, custom_display_name)
-			VALUES ($1, $2, $3, $4)
+				(device_id, hidden, custom_display_name)
+			VALUES ($1, $2, $3)
 			ON CONFLICT (device_id) DO UPDATE SET
-				sort_order = EXCLUDED.sort_order,
 				hidden = EXCLUDED.hidden,
 				custom_display_name = EXCLUDED.custom_display_name,
 				updated_at = NOW()
-		`, prefs.DeviceID, prefs.SortOrder, prefs.Hidden,
-			prefs.CustomDisplayName)
+		`, prefs.DeviceID, prefs.Hidden, prefs.CustomDisplayName)
 		if err != nil {
 			log.Printf("saving device preferences: %v", err)
 			http.Error(w, "could not save preferences", http.StatusInternalServerError)
@@ -109,7 +107,32 @@ func deviceOrderHandler(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
-		for index, id := range request.DeviceIDs {
+		rows, err := tx.Query(r.Context(), `
+			SELECT device_id FROM device_preferences
+			ORDER BY sort_order NULLS LAST, device_id
+		`)
+		if err != nil {
+			http.Error(w, "could not update device order", http.StatusInternalServerError)
+			return
+		}
+		var existingIDs []string
+		for rows.Next() {
+			var id string
+			if err = rows.Scan(&id); err != nil {
+				break
+			}
+			existingIDs = append(existingIDs, id)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			http.Error(w, "could not update device order", http.StatusInternalServerError)
+			return
+		}
+		fullOrder := completeDeviceOrder(request.DeviceIDs, existingIDs)
+		for index, id := range fullOrder {
 			_, err = tx.Exec(r.Context(), `
 				INSERT INTO device_preferences (device_id, sort_order)
 				VALUES ($1, $2)
@@ -126,6 +149,21 @@ func deviceOrderHandler(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func completeDeviceOrder(requested, existing []string) []string {
+	result := append([]string(nil), requested...)
+	seen := make(map[string]struct{}, len(result))
+	for _, id := range result {
+		seen[id] = struct{}{}
+	}
+	for _, id := range existing {
+		if _, present := seen[id]; !present {
+			result = append(result, id)
+			seen[id] = struct{}{}
+		}
+	}
+	return result
 }
 
 func deviceIconHandler(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
