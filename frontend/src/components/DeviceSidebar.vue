@@ -53,12 +53,10 @@ const filteredDevices = computed(() =>
     const query = search.value.trim().toLowerCase();
     const matchesState =
       filter.value === "hidden"
-        ? device.hidden && !device.archived
-        : filter.value === "archived"
-          ? device.archived
-          : !device.hidden && !device.archived &&
-            (filter.value === "all" ||
-              (filter.value === "online" ? device.online : !device.online));
+        ? device.hidden
+        : !device.hidden &&
+          (filter.value === "all" ||
+            (filter.value === "online" ? device.online : !device.online));
     return (
       (!query ||
         `${device.display_name} ${device.original_display_name} ${device.model}`

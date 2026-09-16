@@ -10,7 +10,6 @@ export interface Device {
   speed: number;
   last_reported_at: string | null;
   sort_order: number | null;
-  archived: boolean;
   hidden: boolean;
   custom_display_name: string | null;
   icon_storage_path: string | null;
@@ -20,7 +19,6 @@ export interface Device {
 export interface DevicePreferenceUpdate {
   device_id: string;
   sort_order: number | null;
-  archived: boolean;
   hidden: boolean;
   custom_display_name: string | null;
   icon_storage_path: string | null;

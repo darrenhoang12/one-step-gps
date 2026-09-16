@@ -25,7 +25,7 @@ const { data, isPending, error, refetch } = useQuery({
 });
 const devices = computed(() => data.value ?? []);
 const mapDevices = computed(() =>
-  devices.value.filter((device) => !device.hidden && !device.archived),
+  devices.value.filter((device) => !device.hidden),
 );
 const sidebarOpen = ref(true);
 const selectedId = ref<string | null>(null);
@@ -47,7 +47,6 @@ function preferenceFor(device: Device): DevicePreferenceUpdate {
   return {
     device_id: device.device_id,
     sort_order: device.sort_order,
-    archived: device.archived,
     hidden: device.hidden,
     custom_display_name: device.custom_display_name,
     icon_storage_path: device.icon_storage_path,
@@ -66,7 +65,7 @@ async function saveDevice(deviceId: string, changes: Partial<Device>) {
   queryClient.setQueryData<Device[]>(queryKey, (devices = []) =>
     devices.map((device) => (device.device_id === deviceId ? updated : device)),
   );
-  if ((updated.hidden || updated.archived) && selectedId.value === deviceId) {
+  if (updated.hidden && selectedId.value === deviceId) {
     selectedId.value = null;
   }
   savingIds.value = new Set(savingIds.value).add(deviceId);

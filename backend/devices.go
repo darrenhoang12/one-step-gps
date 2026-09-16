@@ -58,7 +58,6 @@ func getDevices(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
 				continue
 			}
 			device["sort_order"] = prefs.SortOrder
-			device["archived"] = prefs.Archived
 			device["hidden"] = prefs.Hidden
 			device["custom_display_name"] = prefs.CustomDisplayName
 			device["icon_storage_path"] = prefs.IconStoragePath
@@ -82,7 +81,7 @@ func getDevices(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
 
 func loadPreferences(r *http.Request, db *pgxpool.Pool) (map[string]devicePreferences, error) {
 	rows, err := db.Query(r.Context(), `
-		SELECT device_id, sort_order, archived, hidden, custom_display_name, icon_storage_path
+		SELECT device_id, sort_order, hidden, custom_display_name, icon_storage_path
 		FROM device_preferences
 	`)
 	if err != nil {
@@ -92,7 +91,7 @@ func loadPreferences(r *http.Request, db *pgxpool.Pool) (map[string]devicePrefer
 	result := make(map[string]devicePreferences)
 	for rows.Next() {
 		var prefs devicePreferences
-		if err := rows.Scan(&prefs.DeviceID, &prefs.SortOrder, &prefs.Archived, &prefs.Hidden,
+		if err := rows.Scan(&prefs.DeviceID, &prefs.SortOrder, &prefs.Hidden,
 			&prefs.CustomDisplayName, &prefs.IconStoragePath); err != nil {
 			return nil, err
 		}

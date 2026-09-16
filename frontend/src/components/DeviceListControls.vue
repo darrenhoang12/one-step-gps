@@ -3,7 +3,7 @@ import { Search } from "@lucide/vue";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-export type DeviceFilter = "all" | "online" | "offline" | "hidden" | "archived";
+export type DeviceFilter = "all" | "online" | "offline" | "hidden";
 
 defineProps<{ search: string; filter: DeviceFilter }>();
 const emit = defineEmits<{
@@ -15,7 +15,6 @@ const options: { value: DeviceFilter; label: string }[] = [
   { value: "online", label: "Online" },
   { value: "offline", label: "Offline" },
   { value: "hidden", label: "Hidden" },
-  { value: "archived", label: "Archived" },
 ];
 </script>
 

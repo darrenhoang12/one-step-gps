@@ -30,7 +30,6 @@ const (
 type devicePreferences struct {
 	DeviceID          string  `json:"device_id"`
 	SortOrder         *int    `json:"sort_order"`
-	Archived          bool    `json:"archived"`
 	Hidden            bool    `json:"hidden"`
 	CustomDisplayName *string `json:"custom_display_name"`
 	IconStoragePath   *string `json:"icon_storage_path"`
@@ -60,16 +59,15 @@ func preferencesHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 		_, err := db.Exec(r.Context(), `
 			INSERT INTO device_preferences
-				(device_id, sort_order, archived, hidden, custom_display_name, icon_storage_path)
-			VALUES ($1, $2, $3, $4, $5, $6)
+				(device_id, sort_order, hidden, custom_display_name, icon_storage_path)
+			VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (device_id) DO UPDATE SET
 				sort_order = EXCLUDED.sort_order,
-				archived = EXCLUDED.archived,
 				hidden = EXCLUDED.hidden,
 				custom_display_name = EXCLUDED.custom_display_name,
 				icon_storage_path = COALESCE(EXCLUDED.icon_storage_path, device_preferences.icon_storage_path),
 				updated_at = NOW()
-		`, prefs.DeviceID, prefs.SortOrder, prefs.Archived, prefs.Hidden,
+		`, prefs.DeviceID, prefs.SortOrder, prefs.Hidden,
 			prefs.CustomDisplayName, prefs.IconStoragePath)
 		if err != nil {
 			log.Printf("saving device preferences: %v", err)

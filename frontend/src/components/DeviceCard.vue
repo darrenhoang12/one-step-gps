@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, Clock3, Eye, EyeOff, Gauge, GripVertical, ImageOff, MapPin, Pencil, RotateCcw, Truck, Upload } from "@lucide/vue";
+import { Clock3, Eye, EyeOff, Gauge, GripVertical, ImageOff, MapPin, Pencil, RotateCcw, Truck, Upload } from "@lucide/vue";
 import { ref } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -111,9 +111,6 @@ function uploadCrop(file: File) {
       </Button>
       <Button variant="ghost" size="icon-sm" :title="device.hidden ? 'Show device' : 'Hide device'" @click="emit('update', device.device_id, { hidden: !device.hidden })">
         <Eye v-if="device.hidden" :size="14" /><EyeOff v-else :size="14" />
-      </Button>
-      <Button variant="ghost" size="icon-sm" :title="device.archived ? 'Restore device' : 'Archive device'" @click="emit('update', device.device_id, { archived: !device.archived })">
-        <ArchiveRestore v-if="device.archived" :size="14" /><Archive v-else :size="14" />
       </Button>
       <Button variant="ghost" size="icon-sm" title="Upload device icon (max 5 MB, 1024×1024)" @click="fileInput?.click()"><Upload :size="14" /></Button>
       <Button
