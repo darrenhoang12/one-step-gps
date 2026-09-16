@@ -32,7 +32,7 @@ type devicePreferences struct {
 	SortOrder         *int    `json:"sort_order"`
 	Hidden            bool    `json:"hidden"`
 	CustomDisplayName *string `json:"custom_display_name"`
-	IconStoragePath   *string `json:"icon_storage_path"`
+	IconStoragePath   *string `json:"-"`
 }
 
 type deviceOrderRequest struct {
@@ -59,16 +59,15 @@ func preferencesHandler(db *pgxpool.Pool) http.HandlerFunc {
 
 		_, err := db.Exec(r.Context(), `
 			INSERT INTO device_preferences
-				(device_id, sort_order, hidden, custom_display_name, icon_storage_path)
-			VALUES ($1, $2, $3, $4, $5)
+				(device_id, sort_order, hidden, custom_display_name)
+			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (device_id) DO UPDATE SET
 				sort_order = EXCLUDED.sort_order,
 				hidden = EXCLUDED.hidden,
 				custom_display_name = EXCLUDED.custom_display_name,
-				icon_storage_path = COALESCE(EXCLUDED.icon_storage_path, device_preferences.icon_storage_path),
 				updated_at = NOW()
 		`, prefs.DeviceID, prefs.SortOrder, prefs.Hidden,
-			prefs.CustomDisplayName, prefs.IconStoragePath)
+			prefs.CustomDisplayName)
 		if err != nil {
 			log.Printf("saving device preferences: %v", err)
 			http.Error(w, "could not save preferences", http.StatusInternalServerError)
@@ -199,7 +198,7 @@ func uploadDeviceIcon(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, 
 		http.Error(w, "could not save icon", http.StatusInternalServerError)
 		return
 	}
-	if oldStoragePath != nil && *oldStoragePath != storagePath {
+	if oldStoragePath != nil && *oldStoragePath != storagePath && strings.HasPrefix(*oldStoragePath, "device-icons/") {
 		if err := storage.Delete(r.Context(), *oldStoragePath); err != nil {
 			log.Printf("deleting previous device icon: %v", err)
 		}

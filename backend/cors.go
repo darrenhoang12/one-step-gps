@@ -19,18 +19,14 @@ func corsMiddleware(allowedOrigin string, next http.Handler) http.Handler {
 
 		w.Header().Add("Vary", "Origin")
 		if origin != allowedOrigin {
-			if r.Method == http.MethodOptions {
-				http.Error(w, "origin not allowed", http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
+			http.Error(w, "origin not allowed", http.StatusForbidden)
 			return
 		}
 
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		if r.Method == http.MethodOptions {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}

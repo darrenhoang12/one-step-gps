@@ -43,13 +43,16 @@ function retryDevices() {
   void refetch();
 }
 
+function actionError(cause: unknown, fallback: string): string {
+  return cause instanceof Error ? cause.message : fallback;
+}
+
 function preferenceFor(device: Device): DevicePreferenceUpdate {
   return {
     device_id: device.device_id,
     sort_order: device.sort_order,
     hidden: device.hidden,
     custom_display_name: device.custom_display_name,
-    icon_storage_path: device.icon_storage_path,
   };
 }
 
@@ -74,8 +77,7 @@ async function saveDevice(deviceId: string, changes: Partial<Device>) {
     await updateDevicePreferences(preferenceFor(updated));
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value =
-      cause instanceof Error ? cause.message : "Could not save preferences";
+    preferenceError.value = actionError(cause, "Could not save preferences");
   } finally {
     const next = new Set(savingIds.value);
     next.delete(deviceId);
@@ -102,8 +104,7 @@ async function reorderDevices(deviceIds: string[]) {
     await updateDeviceOrder(deviceIds);
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value =
-      cause instanceof Error ? cause.message : "Could not save device order";
+    preferenceError.value = actionError(cause, "Could not save device order");
   }
 }
 
@@ -126,8 +127,7 @@ async function uploadIcon(deviceId: string, file: File) {
     );
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value =
-      cause instanceof Error ? cause.message : "Could not upload icon";
+    preferenceError.value = actionError(cause, "Could not upload icon");
   } finally {
     const next = new Set(savingIds.value);
     next.delete(deviceId);
@@ -150,8 +150,7 @@ async function removeIcon(deviceId: string) {
     await removeDeviceIcon(deviceId);
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value =
-      cause instanceof Error ? cause.message : "Could not remove icon";
+    preferenceError.value = actionError(cause, "Could not remove icon");
   } finally {
     const next = new Set(savingIds.value);
     next.delete(deviceId);
@@ -163,7 +162,10 @@ async function removeIcon(deviceId: string) {
 <template>
   <div class="app-shell">
     <AppHeader />
-    <main class="workspace" :class="{ 'sidebar-collapsed': !sidebarOpen }">
+    <main
+      class="workspace"
+      :class="{ 'sidebar-collapsed': !sidebarOpen }"
+    >
       <DeviceSidebar
         :devices="devices"
         :selected-id="selectedId"

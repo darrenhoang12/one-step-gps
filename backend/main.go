@@ -29,12 +29,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuring R2 storage: %v", err)
 	}
+	auth, err := newAPIKeyAuth()
+	if err != nil {
+		log.Fatalf("configuring authentication: %v", err)
+	}
 
-	mux.HandleFunc("/get-devices", getDevices(db, storage))
-	mux.HandleFunc("/preferences", preferencesHandler(db))
-	mux.HandleFunc("/preferences/order", deviceOrderHandler(db))
-	mux.HandleFunc("/preferences/icon", deviceIconHandler(db, storage))
-
+	protected := http.NewServeMux()
+	protected.HandleFunc("/get-devices", getDevices(db, storage))
+	protected.HandleFunc("/preferences", preferencesHandler(db))
+	protected.HandleFunc("/preferences/order", deviceOrderHandler(db))
+	protected.HandleFunc("/preferences/icon", deviceIconHandler(db, storage))
+	mux.Handle("/get-devices", auth.requireKey(protected))
+	mux.Handle("/preferences", auth.requireKey(protected))
+	mux.Handle("/preferences/", auth.requireKey(protected))
 	fmt.Println("Server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(os.Getenv("CORS_ALLOWED_ORIGIN"), mux)))
 }

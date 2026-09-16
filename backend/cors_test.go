@@ -21,7 +21,7 @@ func TestCORSMiddleware(t *testing.T) {
 	}{
 		{"allowed GET", http.MethodGet, allowedOrigin, http.StatusOK, allowedOrigin},
 		{"allowed preflight", http.MethodOptions, allowedOrigin, http.StatusNoContent, allowedOrigin},
-		{"other origin", http.MethodGet, "https://other.example.com", http.StatusOK, ""},
+		{"other origin", http.MethodGet, "https://other.example.com", http.StatusForbidden, ""},
 		{"rejected preflight", http.MethodOptions, "https://other.example.com", http.StatusForbidden, ""},
 		{"no origin", http.MethodGet, "", http.StatusOK, ""},
 	}
@@ -43,10 +43,10 @@ func TestCORSMiddleware(t *testing.T) {
 			}
 			if tt.method == http.MethodOptions && tt.origin == allowedOrigin {
 				if got := response.Header().Get("Access-Control-Allow-Methods"); got != "GET, PUT, POST, DELETE" {
-					t.Errorf("allowed methods = %q, want GET, PUT, POST", got)
+					t.Errorf("allowed methods = %q, want GET, PUT, POST, DELETE", got)
 				}
-				if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {
-					t.Errorf("allowed headers = %q, want Content-Type", got)
+				if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type" {
+					t.Errorf("allowed headers = %q, want Authorization, Content-Type", got)
 				}
 			}
 		})

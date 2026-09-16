@@ -21,5 +21,4 @@ export interface DevicePreferenceUpdate {
   sort_order: number | null;
   hidden: boolean;
   custom_display_name: string | null;
-  icon_storage_path: string | null;
 }
