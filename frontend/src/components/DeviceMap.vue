@@ -47,6 +47,8 @@ declare global {
   }
 }
 
+const minimumMapZoom = 4;
+
 const props = defineProps<{
   devices: Device[];
   selectedId: string | null;
@@ -158,6 +160,11 @@ function createMap(google: MapsApi, preserveView = false) {
   map = new google.maps.Map(mapElement.value, {
     center: center ?? { lat: 36.1, lng: -119.7 },
     zoom: zoom ?? 6,
+    minZoom: minimumMapZoom,
+    restriction: {
+      latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
+      strictBounds: true,
+    },
     mapId: env.googleMapsMapId,
     colorScheme: theme.value === "dark" ? "DARK" : "LIGHT",
     backgroundColor: theme.value === "dark" ? "#172334" : "#e7e8db",
