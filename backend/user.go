@@ -6,15 +6,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "golang.org/x/image/webp"
+)
+
+const (
+	maxIconBytes      = 5 << 20
+	maxIconDimension  = 1024
+	multipartOverhead = 1 << 20
 )
 
 type devicePreferences struct {
@@ -121,71 +131,140 @@ func deviceOrderHandler(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func deviceIconHandler(db *pgxpool.Pool, uploadDir string) http.HandlerFunc {
+func deviceIconHandler(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.Header().Set("Allow", http.MethodPost)
+		switch r.Method {
+		case http.MethodPost:
+			uploadDeviceIcon(w, r, db, storage)
+		case http.MethodDelete:
+			removeDeviceIcon(w, r, db, storage)
+		default:
+			w.Header().Set("Allow", http.MethodPost+", "+http.MethodDelete)
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
-		if err := r.ParseMultipartForm(5 << 20); err != nil {
-			http.Error(w, "icon must be smaller than 5 MB", http.StatusBadRequest)
-			return
-		}
-		deviceID := strings.TrimSpace(r.FormValue("device_id"))
-		if deviceID == "" {
-			http.Error(w, "device_id is required", http.StatusBadRequest)
-			return
-		}
-		file, header, err := r.FormFile("icon")
-		if err != nil {
-			http.Error(w, "icon file is required", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-		extension, err := imageExtension(file, header)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if err := os.MkdirAll(uploadDir, 0o755); err != nil {
-			http.Error(w, "could not prepare icon storage", http.StatusInternalServerError)
-			return
-		}
-		filename, err := randomFilename(extension)
-		if err != nil {
-			http.Error(w, "could not create icon name", http.StatusInternalServerError)
-			return
-		}
-		destinationPath := filepath.Join(uploadDir, filename)
-		destination, err := os.OpenFile(destinationPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-		if err != nil {
-			http.Error(w, "could not store icon", http.StatusInternalServerError)
-			return
-		}
-		_, copyErr := io.Copy(destination, file)
-		closeErr := destination.Close()
-		if copyErr != nil || closeErr != nil {
-			_ = os.Remove(destinationPath)
-			http.Error(w, "could not store icon", http.StatusInternalServerError)
-			return
-		}
+	}
+}
 
-		storagePath := "/uploads/" + filename
-		_, err = db.Exec(r.Context(), `
+func uploadDeviceIcon(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, storage iconStorage) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxIconBytes+multipartOverhead)
+	if err := r.ParseMultipartForm(maxIconBytes); err != nil {
+		http.Error(w, "icon must be smaller than 5 MB", http.StatusBadRequest)
+		return
+	}
+	deviceID := strings.TrimSpace(r.FormValue("device_id"))
+	if deviceID == "" {
+		http.Error(w, "device_id is required", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("icon")
+	if err != nil {
+		http.Error(w, "icon file is required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	if header.Size > maxIconBytes {
+		http.Error(w, "icon must be 5 MB or smaller", http.StatusBadRequest)
+		return
+	}
+	extension, contentType, err := imageMetadata(file, header)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	filename, err := randomFilename(extension)
+	if err != nil {
+		http.Error(w, "could not create icon name", http.StatusInternalServerError)
+		return
+	}
+	storagePath := "device-icons/" + filename
+	var oldStoragePath *string
+	err = db.QueryRow(r.Context(), `
+			SELECT icon_storage_path FROM device_preferences WHERE device_id = $1
+		`, deviceID).Scan(&oldStoragePath)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "could not read existing icon", http.StatusInternalServerError)
+		return
+	}
+	if err := storage.Put(r.Context(), storagePath, file, contentType); err != nil {
+		log.Printf("uploading device icon: %v", err)
+		http.Error(w, "could not upload icon", http.StatusBadGateway)
+		return
+	}
+	_, err = db.Exec(r.Context(), `
 			INSERT INTO device_preferences (device_id, icon_storage_path)
 			VALUES ($1, $2)
 			ON CONFLICT (device_id) DO UPDATE SET icon_storage_path = EXCLUDED.icon_storage_path, updated_at = NOW()
 		`, deviceID, storagePath)
-		if err != nil {
-			_ = os.Remove(destinationPath)
-			log.Printf("saving device icon: %v", err)
-			http.Error(w, "could not save icon", http.StatusInternalServerError)
+	if err != nil {
+		_ = storage.Delete(r.Context(), storagePath)
+		log.Printf("saving device icon: %v", err)
+		http.Error(w, "could not save icon", http.StatusInternalServerError)
+		return
+	}
+	if oldStoragePath != nil && *oldStoragePath != storagePath {
+		if err := storage.Delete(r.Context(), *oldStoragePath); err != nil {
+			log.Printf("deleting previous device icon: %v", err)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"icon_storage_path": storagePath,
+		"icon_url":          storage.PublicURL(storagePath),
+	})
+}
+
+func removeDeviceIcon(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, storage iconStorage) {
+	var request struct {
+		DeviceID string `json:"device_id"`
+	}
+	if !decodeJSON(w, r, &request) {
+		return
+	}
+	request.DeviceID = strings.TrimSpace(request.DeviceID)
+	if request.DeviceID == "" {
+		http.Error(w, "device_id is required", http.StatusBadRequest)
+		return
+	}
+
+	var storagePath *string
+	err := db.QueryRow(r.Context(), `
+		SELECT icon_storage_path
+		FROM device_preferences
+		WHERE device_id = $1
+	`, request.DeviceID).Scan(&storagePath)
+	if errors.Is(err, pgx.ErrNoRows) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err != nil {
+		log.Printf("clearing device icon: %v", err)
+		http.Error(w, "could not remove icon", http.StatusInternalServerError)
+		return
+	}
+	_, err = db.Exec(r.Context(), `
+		UPDATE device_preferences
+		SET icon_storage_path = NULL, updated_at = NOW()
+		WHERE device_id = $1
+	`, request.DeviceID)
+	if err != nil {
+		log.Printf("clearing device icon: %v", err)
+		http.Error(w, "could not remove icon", http.StatusInternalServerError)
+		return
+	}
+	if storagePath != nil && strings.HasPrefix(*storagePath, "device-icons/") {
+		if err := storage.Delete(r.Context(), *storagePath); err != nil {
+			if _, restoreErr := db.Exec(r.Context(), `
+				UPDATE device_preferences
+				SET icon_storage_path = $2, updated_at = NOW()
+				WHERE device_id = $1
+			`, request.DeviceID, *storagePath); restoreErr != nil {
+				log.Printf("restoring device icon after failed deletion: %v", restoreErr)
+			}
+			log.Printf("deleting device icon: %v", err)
+			http.Error(w, "could not remove icon", http.StatusBadGateway)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"icon_storage_path": storagePath})
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
@@ -222,14 +301,14 @@ func cleanOptionalString(value *string) *string {
 	return &cleaned
 }
 
-func imageExtension(file multipart.File, header *multipart.FileHeader) (string, error) {
+func imageMetadata(file multipart.File, header *multipart.FileHeader) (string, string, error) {
 	buffer := make([]byte, 512)
 	count, err := file.Read(buffer)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return "", errors.New("could not read icon")
+		return "", "", errors.New("could not read icon")
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", errors.New("could not read icon")
+		return "", "", errors.New("could not read icon")
 	}
 	mimeType := http.DetectContentType(buffer[:count])
 	extensions := map[string]string{
@@ -240,9 +319,22 @@ func imageExtension(file multipart.File, header *multipart.FileHeader) (string, 
 	}
 	extension, ok := extensions[mimeType]
 	if !ok {
-		return "", fmt.Errorf("%s is not a supported image type", header.Filename)
+		return "", "", fmt.Errorf("%s is not a supported image type", header.Filename)
 	}
-	return extension, nil
+	config, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return "", "", fmt.Errorf("%s is not a valid image", header.Filename)
+	}
+	if config.Width > maxIconDimension || config.Height > maxIconDimension {
+		return "", "", fmt.Errorf("icon dimensions must be %dx%d pixels or smaller", maxIconDimension, maxIconDimension)
+	}
+	if config.Width != config.Height {
+		return "", "", errors.New("icon must be square")
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", "", errors.New("could not read icon")
+	}
+	return extension, mimeType, nil
 }
 
 func randomFilename(extension string) (string, error) {

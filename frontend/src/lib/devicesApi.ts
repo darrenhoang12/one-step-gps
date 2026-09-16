@@ -15,6 +15,7 @@ const deviceResponseSchema = z.object({
       hidden: z.boolean().optional(),
       custom_display_name: z.string().nullable().optional(),
       icon_storage_path: z.string().nullable().optional(),
+      icon_url: z.url().nullable().optional(),
       latest_device_point: z
         .object({
           lat: z.number().nullable().optional(),
@@ -61,18 +62,21 @@ export async function fetchDevices(signal?: AbortSignal): Promise<Device[]> {
       hidden: device.hidden ?? false,
       custom_display_name: customName,
       icon_storage_path: iconPath,
-      icon_url: iconPath ? `${env.apiBaseUrl}${iconPath}` : null,
+      icon_url: device.icon_url ?? null,
     };
   });
 }
 
-export async function updateDevicePreferences(update: DevicePreferenceUpdate): Promise<void> {
+export async function updateDevicePreferences(
+  update: DevicePreferenceUpdate,
+): Promise<void> {
   const response = await fetch(`${env.apiBaseUrl}/preferences`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(update),
   });
-  if (!response.ok) throw new Error(`Could not save device preferences (${response.status})`);
+  if (!response.ok)
+    throw new Error(`Could not save device preferences (${response.status})`);
 }
 
 export async function updateDeviceOrder(deviceIds: string[]): Promise<void> {
@@ -81,10 +85,28 @@ export async function updateDeviceOrder(deviceIds: string[]): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ device_ids: deviceIds }),
   });
-  if (!response.ok) throw new Error(`Could not save device order (${response.status})`);
+  if (!response.ok)
+    throw new Error(`Could not save device order (${response.status})`);
 }
 
-export async function uploadDeviceIcon(deviceId: string, file: File): Promise<string> {
+export async function uploadDeviceIcon(
+  deviceId: string,
+  file: File,
+): Promise<{ iconStoragePath: string; iconUrl: string }> {
+  const maxIconBytes = 5 * 1024 * 1024;
+  const maxIconDimension = 1024;
+  if (file.size > maxIconBytes) {
+    throw new Error("Icon must be 5 MB or smaller");
+  }
+
+  const dimensions = await readImageDimensions(file);
+  if (
+    dimensions.width > maxIconDimension ||
+    dimensions.height > maxIconDimension
+  ) {
+    throw new Error("Icon dimensions must be 1024×1024 pixels or smaller");
+  }
+
   const form = new FormData();
   form.set("device_id", deviceId);
   form.set("icon", file);
@@ -92,7 +114,45 @@ export async function uploadDeviceIcon(deviceId: string, file: File): Promise<st
     method: "POST",
     body: form,
   });
-  if (!response.ok) throw new Error(`Could not upload device icon (${response.status})`);
-  const payload = z.object({ icon_storage_path: z.string() }).parse(await response.json());
-  return payload.icon_storage_path;
+  if (!response.ok)
+    throw new Error(`Could not upload device icon (${response.status})`);
+  const payload = z
+    .object({
+      icon_storage_path: z.string(),
+      icon_url: z.string().url(),
+    })
+    .parse(await response.json());
+  return {
+    iconStoragePath: payload.icon_storage_path,
+    iconUrl: payload.icon_url,
+  };
+}
+
+export async function removeDeviceIcon(deviceId: string): Promise<void> {
+  const response = await fetch(`${env.apiBaseUrl}/preferences/icon`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Could not remove device icon (${response.status})`);
+  }
+}
+
+function readImageDimensions(
+  file: File,
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("The selected icon is not a valid image"));
+    };
+    image.src = objectUrl;
+  });
 }

@@ -42,7 +42,7 @@ func TestCORSMiddleware(t *testing.T) {
 				t.Errorf("allowed origin = %q, want %q", got, tt.wantOrigin)
 			}
 			if tt.method == http.MethodOptions && tt.origin == allowedOrigin {
-				if got := response.Header().Get("Access-Control-Allow-Methods"); got != "GET, PUT, POST" {
+				if got := response.Header().Get("Access-Control-Allow-Methods"); got != "GET, PUT, POST, DELETE" {
 					t.Errorf("allowed methods = %q, want GET, PUT, POST", got)
 				}
 				if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {

@@ -33,6 +33,7 @@ const emit = defineEmits<{
   updateDevice: [deviceId: string, changes: Partial<Device>];
   reorder: [deviceIds: string[]];
   uploadIcon: [deviceId: string, file: File];
+  removeIcon: [deviceId: string];
 }>();
 
 const search = ref("");
@@ -223,6 +224,7 @@ watch(
             @select="emit('select', $event)"
             @update="updateDevice"
             @upload="uploadIcon"
+            @remove-icon="emit('removeIcon', $event)"
             @drag-start="draggedId = $event"
             @drop="dropDevice"
           />

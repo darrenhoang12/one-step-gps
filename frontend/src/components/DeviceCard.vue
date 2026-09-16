@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, Clock3, Eye, EyeOff, Gauge, GripVertical, MapPin, Pencil, RotateCcw, Truck, Upload } from "@lucide/vue";
+import { Archive, ArchiveRestore, Clock3, Eye, EyeOff, Gauge, GripVertical, ImageOff, MapPin, Pencil, RotateCcw, Truck, Upload } from "@lucide/vue";
 import { ref } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import ImageCropDialog from "@/components/ImageCropDialog.vue";
 import { formatCoordinates, formatReportedAt } from "@/lib/deviceFormat";
 import type { Device } from "@/types/device";
 
@@ -13,12 +14,15 @@ const emit = defineEmits<{
   select: [deviceId: string];
   update: [deviceId: string, changes: Partial<Device>];
   upload: [deviceId: string, file: File];
+  removeIcon: [deviceId: string];
   dragStart: [deviceId: string];
   drop: [deviceId: string];
 }>();
 const editing = ref(false);
 const customName = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
+const imageToCrop = ref<File | null>(null);
+const fileError = ref<string | null>(null);
 
 function beginEditing() {
   customName.value = props.device.custom_display_name ?? props.device.display_name;
@@ -32,8 +36,18 @@ function saveName() {
 
 function chooseFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
-  if (file) emit("upload", props.device.device_id, file);
+  fileError.value = null;
+  if (file && file.size > 5 * 1024 * 1024) {
+    fileError.value = "Icon must be 5 MB or smaller";
+  } else if (file) {
+    imageToCrop.value = file;
+  }
   (event.target as HTMLInputElement).value = "";
+}
+
+function uploadCrop(file: File) {
+  imageToCrop.value = null;
+  emit("upload", props.device.device_id, file);
 }
 </script>
 
@@ -101,10 +115,21 @@ function chooseFile(event: Event) {
       <Button variant="ghost" size="icon-sm" :title="device.archived ? 'Restore device' : 'Archive device'" @click="emit('update', device.device_id, { archived: !device.archived })">
         <ArchiveRestore v-if="device.archived" :size="14" /><Archive v-else :size="14" />
       </Button>
-      <Button variant="ghost" size="icon-sm" title="Upload device icon" @click="fileInput?.click()"><Upload :size="14" /></Button>
+      <Button variant="ghost" size="icon-sm" title="Upload device icon (max 5 MB, 1024×1024)" @click="fileInput?.click()"><Upload :size="14" /></Button>
+      <Button
+        v-if="device.icon_url"
+        variant="ghost"
+        size="icon-sm"
+        title="Remove device icon"
+        aria-label="Remove device icon"
+        :disabled="saving"
+        @click="emit('removeIcon', device.device_id)"
+      ><ImageOff :size="14" /></Button>
       <input ref="fileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="chooseFile" />
       <span v-if="saving" class="saving-label">Saving…</span>
     </span>
+    <span v-if="fileError" class="file-error" role="alert">{{ fileError }}</span>
+    <ImageCropDialog :file="imageToCrop" @close="imageToCrop = null" @crop="uploadCrop" />
   </Card>
 </template>
 
@@ -171,6 +196,12 @@ function chooseFile(event: Event) {
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
+}
+.file-error {
+  display: block;
+  margin-top: 8px;
+  color: #b33b30;
+  font-size: 10px;
 }
 .device-title {
   display: flex;

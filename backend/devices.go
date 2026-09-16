@@ -15,7 +15,7 @@ type upstreamDevicesResponse struct {
 	ResultList []map[string]any `json:"result_list"`
 }
 
-func getDevices(db *pgxpool.Pool) http.HandlerFunc {
+func getDevices(db *pgxpool.Pool, storage iconStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
@@ -62,6 +62,9 @@ func getDevices(db *pgxpool.Pool) http.HandlerFunc {
 			device["hidden"] = prefs.Hidden
 			device["custom_display_name"] = prefs.CustomDisplayName
 			device["icon_storage_path"] = prefs.IconStoragePath
+			if prefs.IconStoragePath != nil {
+				device["icon_url"] = storage.PublicURL(*prefs.IconStoragePath)
+			}
 		}
 		sort.SliceStable(payload.ResultList, func(i, j int) bool {
 			leftID, _ := payload.ResultList[i]["device_id"].(string)

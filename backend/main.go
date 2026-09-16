@@ -25,16 +25,15 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	uploadDir := os.Getenv("UPLOAD_DIR")
-	if uploadDir == "" {
-		uploadDir = "uploads"
+	storage, err := newR2Storage(context.Background())
+	if err != nil {
+		log.Fatalf("configuring R2 storage: %v", err)
 	}
 
-	mux.HandleFunc("/get-devices", getDevices(db))
+	mux.HandleFunc("/get-devices", getDevices(db, storage))
 	mux.HandleFunc("/preferences", preferencesHandler(db))
 	mux.HandleFunc("/preferences/order", deviceOrderHandler(db))
-	mux.HandleFunc("/preferences/icon", deviceIconHandler(db, uploadDir))
-	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadDir))))
+	mux.HandleFunc("/preferences/icon", deviceIconHandler(db, storage))
 
 	fmt.Println("Server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(os.Getenv("CORS_ALLOWED_ORIGIN"), mux)))

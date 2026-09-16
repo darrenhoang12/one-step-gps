@@ -6,11 +6,11 @@ import DeviceSidebar from "@/components/DeviceSidebar.vue";
 import FleetMapPanel from "@/components/FleetMapPanel.vue";
 import {
   fetchDevices,
+  removeDeviceIcon,
   updateDeviceOrder,
   updateDevicePreferences,
   uploadDeviceIcon,
 } from "@/lib/devicesApi";
-import { env } from "@/lib/env";
 import type { Device, DevicePreferenceUpdate } from "@/types/device";
 
 const queryClient = useQueryClient();
@@ -24,7 +24,9 @@ const { data, isPending, error, refetch } = useQuery({
   refetchOnReconnect: false,
 });
 const devices = computed(() => data.value ?? []);
-const mapDevices = computed(() => devices.value.filter((device) => !device.hidden && !device.archived));
+const mapDevices = computed(() =>
+  devices.value.filter((device) => !device.hidden && !device.archived),
+);
 const sidebarOpen = ref(true);
 const selectedId = ref<string | null>(null);
 const selectionRequest = ref(0);
@@ -58,10 +60,11 @@ async function saveDevice(deviceId: string, changes: Partial<Device>) {
   if (!current) return;
   const updated = { ...current, ...changes };
   if ("custom_display_name" in changes) {
-    updated.display_name = changes.custom_display_name?.trim() || updated.original_display_name;
+    updated.display_name =
+      changes.custom_display_name?.trim() || updated.original_display_name;
   }
   queryClient.setQueryData<Device[]>(queryKey, (devices = []) =>
-    devices.map((device) => device.device_id === deviceId ? updated : device),
+    devices.map((device) => (device.device_id === deviceId ? updated : device)),
   );
   if ((updated.hidden || updated.archived) && selectedId.value === deviceId) {
     selectedId.value = null;
@@ -72,7 +75,8 @@ async function saveDevice(deviceId: string, changes: Partial<Device>) {
     await updateDevicePreferences(preferenceFor(updated));
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value = cause instanceof Error ? cause.message : "Could not save preferences";
+    preferenceError.value =
+      cause instanceof Error ? cause.message : "Could not save preferences";
   } finally {
     const next = new Set(savingIds.value);
     next.delete(deviceId);
@@ -83,17 +87,24 @@ async function saveDevice(deviceId: string, changes: Partial<Device>) {
 async function reorderDevices(deviceIds: string[]) {
   const previous = queryClient.getQueryData<Device[]>(queryKey) ?? [];
   const positions = new Map(deviceIds.map((id, index) => [id, index]));
-  const reordered = [...previous].sort((left, right) =>
-    (positions.get(left.device_id) ?? Number.MAX_SAFE_INTEGER) -
-    (positions.get(right.device_id) ?? Number.MAX_SAFE_INTEGER),
-  ).map((device) => ({ ...device, sort_order: positions.get(device.device_id) ?? device.sort_order }));
+  const reordered = [...previous]
+    .sort(
+      (left, right) =>
+        (positions.get(left.device_id) ?? Number.MAX_SAFE_INTEGER) -
+        (positions.get(right.device_id) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((device) => ({
+      ...device,
+      sort_order: positions.get(device.device_id) ?? device.sort_order,
+    }));
   queryClient.setQueryData(queryKey, reordered);
   preferenceError.value = null;
   try {
     await updateDeviceOrder(deviceIds);
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value = cause instanceof Error ? cause.message : "Could not save device order";
+    preferenceError.value =
+      cause instanceof Error ? cause.message : "Could not save device order";
   }
 }
 
@@ -102,15 +113,46 @@ async function uploadIcon(deviceId: string, file: File) {
   savingIds.value = new Set(savingIds.value).add(deviceId);
   preferenceError.value = null;
   try {
-    const path = await uploadDeviceIcon(deviceId, file);
-    queryClient.setQueryData<Device[]>(queryKey, (devices = []) => devices.map((device) =>
-      device.device_id === deviceId
-        ? { ...device, icon_storage_path: path, icon_url: `${env.apiBaseUrl}${path}` }
-        : device,
-    ));
+    const uploaded = await uploadDeviceIcon(deviceId, file);
+    queryClient.setQueryData<Device[]>(queryKey, (devices = []) =>
+      devices.map((device) =>
+        device.device_id === deviceId
+          ? {
+              ...device,
+              icon_storage_path: uploaded.iconStoragePath,
+              icon_url: uploaded.iconUrl,
+            }
+          : device,
+      ),
+    );
   } catch (cause) {
     queryClient.setQueryData(queryKey, previous);
-    preferenceError.value = cause instanceof Error ? cause.message : "Could not upload icon";
+    preferenceError.value =
+      cause instanceof Error ? cause.message : "Could not upload icon";
+  } finally {
+    const next = new Set(savingIds.value);
+    next.delete(deviceId);
+    savingIds.value = next;
+  }
+}
+
+async function removeIcon(deviceId: string) {
+  const previous = queryClient.getQueryData<Device[]>(queryKey) ?? [];
+  queryClient.setQueryData<Device[]>(queryKey, (devices = []) =>
+    devices.map((device) =>
+      device.device_id === deviceId
+        ? { ...device, icon_storage_path: null, icon_url: null }
+        : device,
+    ),
+  );
+  savingIds.value = new Set(savingIds.value).add(deviceId);
+  preferenceError.value = null;
+  try {
+    await removeDeviceIcon(deviceId);
+  } catch (cause) {
+    queryClient.setQueryData(queryKey, previous);
+    preferenceError.value =
+      cause instanceof Error ? cause.message : "Could not remove icon";
   } finally {
     const next = new Set(savingIds.value);
     next.delete(deviceId);
@@ -138,6 +180,7 @@ async function uploadIcon(deviceId: string, file: File) {
         @update-device="saveDevice"
         @reorder="reorderDevices"
         @upload-icon="uploadIcon"
+        @remove-icon="removeIcon"
       />
       <FleetMapPanel
         :devices="mapDevices"
