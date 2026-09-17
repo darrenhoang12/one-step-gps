@@ -33,6 +33,10 @@ func main() {
 	mux.HandleFunc("/preferences", preferencesHandler(db))
 	mux.HandleFunc("/preferences/order", deviceOrderHandler(db))
 	mux.HandleFunc("/preferences/icon", deviceIconHandler(db, storage))
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("ok\n"))
+	})
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
