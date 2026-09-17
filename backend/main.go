@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -33,6 +33,15 @@ func main() {
 	mux.HandleFunc("/preferences", preferencesHandler(db))
 	mux.HandleFunc("/preferences/order", deviceOrderHandler(db))
 	mux.HandleFunc("/preferences/icon", deviceIconHandler(db, storage))
-	fmt.Println("Server running at http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(os.Getenv("CORS_ALLOWED_ORIGIN"), mux)))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	server := &http.Server{
+		Addr:              "0.0.0.0:" + port,
+		Handler:           corsMiddleware(os.Getenv("CORS_ALLOWED_ORIGIN"), mux),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	log.Printf("Server listening on port %s", port)
+	log.Fatal(server.ListenAndServe())
 }
